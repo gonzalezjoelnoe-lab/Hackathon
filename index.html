@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>NexoLocal — Red de Comercio y Producción Cercana</title>
+  <title>NexoLocal — Comercio y Producción Cercana</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -13,70 +13,96 @@
 </head>
 <body>
 
-  <!-- ACCESO Y SELECCION DE PERFIL -->
+  <!-- ACCESO: INICIAR SESION Y REGISTRO EN BD -->
   <div id="auth-overlay" class="auth-overlay">
     <div class="auth-card animate-pop">
       <div class="auth-brand">
         <div class="brand-icon"><i data-lucide="compass"></i></div>
         <div>
           <h1>NexoLocal</h1>
-          <p>Comercio de barrio y productores directos en un solo lugar</p>
+          <p>Red de comercio de barrio y productores directos</p>
         </div>
       </div>
 
-      <div class="role-selector">
-        <button type="button" class="role-btn active" data-role="comprador" onclick="seleccionarRolAuth('comprador')">
-          <i data-lucide="shopping-bag"></i>
-          <span>Comprador</span>
-          <small>Explorar oferta cercana</small>
-        </button>
-        <button type="button" class="role-btn" data-role="vendedor" onclick="seleccionarRolAuth('vendedor')">
-          <i data-lucide="store"></i>
-          <span>Negocio o Productor</span>
-          <small>Inventario, pedidos y ventas</small>
-        </button>
+      <div class="auth-mode-tabs">
+        <button type="button" class="auth-tab active" id="tab-btn-login" onclick="cambiarModoAuth('login')">Iniciar Sesión</button>
+        <button type="button" class="auth-tab" id="tab-btn-registro" onclick="cambiarModoAuth('registro')">Crear Cuenta</button>
       </div>
 
-     
-     <form id="login-form" onsubmit="iniciarSesion(event)">
-  <div id="grupo-nombre" class="input-group hidden">
-    <label for="auth-nombre" id="label-nombre">Tu nombre</label>
-    <input type="text" id="auth-nombre" placeholder="Nombre personal o comercial" />
-  </div>
-  <div id="grupo-negocio" class="hidden">
-    <div class="input-group">
-      <label for="auth-giro">Giro del negocio</label>
-      <select id="auth-giro" style="width:100%">
-        <option value="produccion">Producción Local</option>
-        <option value="comercio">Tiendas y Abarrotes</option>
-        <option value="insumos">Insumos y Papelería</option>
-        <option value="talleres">Talleres y Oficios</option>
-      </select>
-    </div>
-    <div class="input-group">
-      <label for="auth-whatsapp">WhatsApp del negocio (con lada de país)</label>
-      <input type="tel" id="auth-whatsapp" placeholder="52 + 10 dígitos" />
-    </div>
-  </div>
-  <div class="input-group">
-    <label for="auth-correo">Correo electrónico</label>
-    <input type="email" id="auth-correo" placeholder="contacto@ejemplo.com" required />
-  </div>
-  <div class="input-group">
-    <label for="auth-password">Contraseña</label>
-    <input type="password" id="auth-password" placeholder="Mínimo 6 caracteres" minlength="6" required />
-  </div>
-  <p id="auth-error" class="hint" style="min-height:1.2em"></p>
-  <button type="submit" id="auth-submit" class="btn-primary btn-full">
-    <span id="auth-submit-texto">Ingresar</span>
-    <i data-lucide="arrow-right"></i>
-  </button>
-  <button type="button" id="auth-toggle" class="btn-ghost btn-full" onclick="cambiarModoAuth()">¿No tienes cuenta? Crear una</button>
-</form>
-   
-       
+      <!-- FORMULARIO INICIAR SESION -->
+      <form id="login-form" onsubmit="procesarLogin(event)">
+        <div class="input-group">
+          <label for="login-contacto">Correo o teléfono registrado</label>
+          <input type="text" id="login-contacto" placeholder="usuario@correo.com o 10 dígitos" required />
+        </div>
+        <div class="input-group">
+          <label for="login-password">Contraseña</label>
+          <input type="password" id="login-password" placeholder="Ingresa tu contraseña" required />
+        </div>
+        <p id="auth-error-msg" class="auth-error hidden"></p>
+        <button type="submit" class="btn-primary btn-full">
+          <span>Entrar a mi cuenta</span>
+          <i data-lucide="arrow-right"></i>
+        </button>
+      </form>
+
+      <!-- FORMULARIO REGISTRO -->
+      <form id="register-form" class="hidden" onsubmit="procesarRegistro(event)">
+        <div class="role-selector">
+          <button type="button" class="role-btn active" data-role="comprador" onclick="seleccionarRolRegistro('comprador')">
+            <i data-lucide="shopping-bag"></i>
+            <span>Comprador</span>
+            <small>Buscar y pedir</small>
+          </button>
+          <button type="button" class="role-btn" data-role="vendedor" onclick="seleccionarRolRegistro('vendedor')">
+            <i data-lucide="store"></i>
+            <span>Negocio / Productor</span>
+            <small>Vender y gestionar</small>
+          </button>
+        </div>
+
+        <div class="input-group">
+          <label for="reg-nombre" id="label-reg-nombre">Nombre completo</label>
+          <input type="text" id="reg-nombre" placeholder="Ej. Ana Martínez" required />
+        </div>
+
+        <div id="campos-extra-vendedor" class="hidden">
+          <div class="form-row">
+            <div class="input-group">
+              <label for="reg-giro">Giro del negocio</label>
+              <select id="reg-giro" class="select-field">
+                <option value="produccion">Producción Local</option>
+                <option value="comercio">Tiendas y Abarrotes</option>
+                <option value="insumos">Insumos y Papelería</option>
+                <option value="talleres">Talleres y Oficios</option>
+              </select>
+            </div>
+            <div class="input-group">
+              <label for="reg-whatsapp">WhatsApp (10 dígitos)</label>
+              <input type="text" id="reg-whatsapp" inputmode="numeric" maxlength="10" oninput="soloNumeros(this)" placeholder="6181234567" />
+            </div>
+          </div>
+        </div>
+
+        <div class="input-group">
+          <label for="reg-contacto">Correo o teléfono (será tu usuario)</label>
+          <input type="text" id="reg-contacto" placeholder="contacto@ejemplo.com" required />
+        </div>
+
+        <div class="input-group">
+          <label for="reg-password">Crea una contraseña</label>
+          <input type="password" id="reg-password" minlength="4" placeholder="Mínimo 4 caracteres" required />
+        </div>
+
+        <p id="reg-error-msg" class="auth-error hidden"></p>
+        <button type="submit" class="btn-primary btn-full">
+          <span>Registrar y entrar</span>
+          <i data-lucide="user-plus"></i>
+        </button>
+      </form>
+
       <div class="demo-quick-access">
-        <span>Vista rápida sin registro:</span>
+        <span>Acceso inmediato de prueba:</span>
         <div class="demo-links">
           <button type="button" onclick="accesoRapido('comprador')">Entrar como Comprador</button>
           <button type="button" onclick="accesoRapido('vendedor')">Entrar como Negocio</button>
@@ -101,7 +127,7 @@
         <span>Cambiar a Negocio</span>
       </button>
       
-      <div class="user-pill" onclick="cerrarSesion()" title="Cambiar cuenta">
+      <div class="user-pill" onclick="cerrarSesion()" title="Cerrar sesión">
         <div class="avatar" id="user-avatar">U</div>
         <span id="user-display-name">Usuario</span>
         <i data-lucide="log-out" class="icon-sm"></i>
@@ -113,21 +139,11 @@
   <main id="vista-comprador" class="main-container">
     <section class="filters-bar">
       <div class="filter-chips" id="category-filters">
-        <button class="chip active" data-cat="todos">
-          <i data-lucide="layout-grid"></i> Todos
-        </button>
-        <button class="chip" data-cat="produccion">
-          <i data-lucide="sprout"></i> Producción Local
-        </button>
-        <button class="chip" data-cat="comercio">
-          <i data-lucide="store"></i> Tiendas y Abarrotes
-        </button>
-        <button class="chip" data-cat="insumos">
-          <i data-lucide="package"></i> Insumos y Papelería
-        </button>
-        <button class="chip" data-cat="talleres">
-          <i data-lucide="hammer"></i> Talleres y Oficios
-        </button>
+        <button class="chip active" data-cat="todos"><i data-lucide="layout-grid"></i> Todos</button>
+        <button class="chip" data-cat="produccion"><i data-lucide="sprout"></i> Producción Local</button>
+        <button class="chip" data-cat="comercio"><i data-lucide="store"></i> Tiendas y Abarrotes</button>
+        <button class="chip" data-cat="insumos"><i data-lucide="package"></i> Insumos y Papelería</button>
+        <button class="chip" data-cat="talleres"><i data-lucide="hammer"></i> Talleres y Oficios</button>
       </div>
       <div class="live-indicator">
         <span class="pulse-dot"></span>
@@ -136,7 +152,7 @@
     </section>
 
     <div class="comprador-grid">
-      <!-- APARTADO PARA CONECTAR EL MAPA (LEAFLET + SUPABASE) -->
+      <!-- APARTADO PARA MAPA (LEAFLET + SUPABASE) -->
       <section class="map-wrapper card-surface">
         <div class="map-floating-header">
           <div class="search-box">
@@ -154,7 +170,7 @@
           <div id="map-empty-state" class="map-placeholder">
             <div class="placeholder-icon"><i data-lucide="map-pin"></i></div>
             <h3>Contenedor de Mapa Listo</h3>
-            <p>Conecta la instancia de Leaflet en <code>app.js</code> para desplegar los puntos registrados en la base de datos.</p>
+            <p>Conecta la instancia de Leaflet en <code>MAP_HOOKS</code> para mostrar los negocios registrados en la base de datos.</p>
             <button class="btn-outline-dark" onclick="abrirDetalleTienda()">
               <i data-lucide="eye"></i> Vista previa de ficha de negocio
             </button>
@@ -162,21 +178,21 @@
         </div>
       </section>
 
-      <!-- APARTADO DE ASISTENTE CONVERSACIONAL COMPRADOR -->
+      <!-- ASISTENTE CONVERSACIONAL COMPRADOR -->
       <aside class="chat-wrapper card-surface">
         <div class="chat-header">
           <div class="chat-title">
             <div class="ai-avatar"><i data-lucide="sparkles"></i></div>
             <div>
               <h3>Asistente de Búsqueda</h3>
-              <span>Consulta disponibilidad y arma pedidos locales</span>
+              <span>Analiza catálogo disponible y ubica opciones cercanas</span>
             </div>
           </div>
         </div>
 
         <div id="chat-messages-comprador" class="chat-messages">
           <div class="msg msg-bot">
-            Indica qué productos o insumos necesitas y consultaré los negocios verificados cercanos con existencias disponibles.
+            Indica qué artículos o insumos buscas y consultaré los negocios con existencias disponibles cerca de ti.
           </div>
         </div>
 
@@ -207,11 +223,11 @@
             <i data-lucide="shield-alert"></i> Verificación pendiente
           </span>
         </div>
-        <p>Gestión de inventario, registro de entradas y salidas, y control de pedidos.</p>
+        <p>Control de inventario por cantidad, registro de entradas y salidas, y gestión de pedidos.</p>
       </div>
 
       <div class="seller-actions">
-        <button class="btn-verify" onclick="abrirModalVerificacion()">
+        <button id="btn-abrir-verificacion" class="btn-verify" onclick="abrirModalVerificacion()">
           <i data-lucide="scan-face"></i>
           <span>Validar Identidad</span>
         </button>
@@ -234,27 +250,27 @@
       </button>
     </div>
 
-    <!-- SECCION INVENTARIO (CONECTAR CON TABLA PRODUCTOS Y MOVIMIENTOS) -->
+    <!-- INVENTARIO Y MOVIMIENTOS -->
     <section id="tab-inventario" class="seller-tab-content">
       <div class="kpi-grid">
         <div class="kpi-card card-surface">
           <span>Artículos Registrados</span>
-          <strong id="kpi-total-productos">0</strong>
+          <strong id="kpi-total-productos">1</strong>
         </div>
         <div class="kpi-card card-surface kpi-warning">
-          <span>Stock Crítico (Por agotarse)</span>
+          <span>Stock Crítico (5 o menos)</span>
           <strong id="kpi-stock-bajo">0</strong>
         </div>
         <div class="kpi-card card-surface">
-          <span>Flujo del Día</span>
-          <strong id="kpi-movimientos">0 movimientos</strong>
+          <span>Flujo del Turno</span>
+          <strong id="kpi-movimientos">0 uds movidas</strong>
         </div>
       </div>
 
       <div class="card-surface table-container">
         <div class="section-header">
           <h3>Control de Existencias</h3>
-          <span class="hint">Sincronizado con la vista pública del mapa</span>
+          <span class="hint">Escribe la cantidad exacta (ej. 100) y presiona Salida (-) o Entrada (+)</span>
         </div>
         <table class="inventory-table">
           <thead>
@@ -264,28 +280,17 @@
               <th>Precio Unitario</th>
               <th>Stock Actual</th>
               <th>Estado</th>
-              <th>Entradas / Salidas</th>
+              <th>Registrar Salida / Entrada</th>
             </tr>
           </thead>
           <tbody id="tabla-inventario-body">
-            <!-- Fila base de referencia; se reemplaza al conectar Supabase -->
-            <tr data-id="demo-1">
-              <td><strong>Artículo de Muestra</strong></td>
-              <td>General</td>
-              <td>$0.00</td>
-              <td><span class="stock-num" id="stock-demo-1">10</span> uds</td>
-              <td><span class="badge-ok">En existencia</span></td>
-              <td class="kardex-controls">
-                <button class="btn-kardex minus" onclick="ajustarStock('demo-1', -1)" title="Registrar salida"><i data-lucide="minus"></i></button>
-                <button class="btn-kardex plus" onclick="ajustarStock('demo-1', 1)" title="Registrar entrada"><i data-lucide="plus"></i></button>
-              </td>
-            </tr>
+            <!-- Filas generadas dinámicamente -->
           </tbody>
         </table>
       </div>
     </section>
 
-    <!-- SECCION PEDIDOS (CONECTAR CON TABLA PEDIDOS) -->
+    <!-- PEDIDOS -->
     <section id="tab-pedidos" class="seller-tab-content hidden">
       <div class="orders-split">
         <div class="card-surface panel-box">
@@ -303,14 +308,14 @@
           <div id="lista-pedidos-proveedores" class="orders-list">
             <div class="empty-box">
               <i data-lucide="refresh-cw"></i>
-              <p>Los artículos que alcancen su mínimo de inventario se listarán aquí automáticamente.</p>
+              <p>Los artículos con stock crítico se enlistan aquí automáticamente para resurtido.</p>
             </div>
           </div>
         </div>
       </div>
     </section>
 
-    <!-- SECCION ASISTENTE IA VENDEDOR -->
+    <!-- ASISTENTE IA VENDEDOR -->
     <section id="tab-asistente-ia" class="seller-tab-content hidden">
       <div class="card-surface seller-ai-box">
         <div class="chat-header">
@@ -318,23 +323,28 @@
             <div class="ai-avatar"><i data-lucide="sliders"></i></div>
             <div>
               <h3>Asistente Operativo de Negocio</h3>
-              <span>Publica artículos mediante fotografía o registra entradas y salidas por texto</span>
+              <span>Analiza fotografías de productos nuevos o registra movimientos por texto</span>
             </div>
           </div>
         </div>
 
         <div id="chat-messages-vendedor" class="chat-messages">
           <div class="msg msg-bot">
-            Adjunta una imagen de tu mercancía para catalogarla automáticamente o escribe los movimientos de entrada y salida de tu turno.
+            Adjunta una fotografía de tu producto con su precio para darlo de alta automáticamente, o escribe movimientos como: "Entraron 100 piezas del Artículo de Muestra".
           </div>
+        </div>
+
+        <div id="preview-foto-vendedor" class="upload-preview hidden">
+          <span id="nombre-foto-vendedor">Imagen adjunta</span>
+          <button type="button" onclick="limpiarFotoVendedor()"><i data-lucide="x"></i></button>
         </div>
 
         <form class="chat-input-area" onsubmit="enviarMensajeVendedor(event)">
           <label class="btn-upload" title="Adjuntar fotografía">
             <i data-lucide="camera"></i>
-            <input type="file" id="foto-producto-ia" accept="image/*" hidden />
+            <input type="file" id="foto-producto-ia" accept="image/*" onchange="mostrarPreviewFoto(this)" hidden />
           </label>
-          <input type="text" id="input-chat-vendedor" placeholder="Describe el producto o movimiento a registrar..." />
+          <input type="text" id="input-chat-vendedor" placeholder="Describe el artículo o movimiento a registrar..." />
           <button type="submit" class="btn-send" aria-label="Enviar"><i data-lucide="send"></i></button>
         </form>
       </div>
@@ -364,27 +374,27 @@
     </div>
   </div>
 
-  <!-- MODAL VERIFICACION HUMANA -->
+  <!-- MODAL VERIFICACION HUMANA REAL CON GEMINI VISION -->
   <div id="modal-verificacion" class="modal-backdrop hidden" onclick="cerrarModal('modal-verificacion')">
     <div class="modal-card animate-pop" onclick="event.stopPropagation()">
       <div class="modal-header">
         <div>
-          <h2>Validación de Autenticidad</h2>
-          <p>Verificación visual en sitio para garantizar seguridad a los compradores.</p>
+          <h2>Validación de Autenticidad en Vivo</h2>
+          <p>Verificación visual analizada por IA para evitar perfiles falsos.</p>
         </div>
         <button class="btn-close" onclick="cerrarModal('modal-verificacion')"><i data-lucide="x"></i></button>
       </div>
       <div class="modal-body verify-body">
         <div class="challenge-box">
-          <span>Instrucción de prueba de vida:</span>
-          <strong id="reto-texto">Captura una fotografía frente a tu espacio de trabajo</strong>
+          <span>Instrucción obligatoria para validar:</span>
+          <strong id="reto-texto">Captura una fotografía frente a tu mercancía mostrando tres dedos</strong>
         </div>
-        <label class="camera-dropzone">
+        <label class="camera-dropzone" id="dropzone-verificacion">
           <i data-lucide="camera"></i>
-          <span>Activar cámara y enviar captura</span>
-          <input type="file" accept="image/*" capture="user" onchange="procesarVerificacion(this)" hidden />
+          <span>Tomar o subir fotografía de verificación</span>
+          <input type="file" id="input-foto-verificacion" accept="image/*" capture="user" onchange="procesarVerificacionReal(this)" hidden />
         </label>
-        <p id="verify-status-text" class="hint"></p>
+        <div id="verify-feedback" class="verify-feedback hidden"></div>
       </div>
     </div>
   </div>
@@ -404,14 +414,23 @@
           <label>Nombre del artículo</label>
           <input type="text" id="prod-nombre" required />
         </div>
+        <div class="input-group">
+          <label>Categoría</label>
+          <select id="prod-categoria" class="select-field">
+            <option value="Producción Local">Producción Local</option>
+            <option value="Tiendas y Abarrotes">Tiendas y Abarrotes</option>
+            <option value="Insumos y Papelería">Insumos y Papelería</option>
+            <option value="Talleres y Oficios">Talleres y Oficios</option>
+          </select>
+        </div>
         <div class="form-row">
           <div class="input-group">
-            <label>Precio ($)</label>
-            <input type="number" id="prod-precio" step="0.01" required />
+            <label>Precio Unitario ($)</label>
+            <input type="text" id="prod-precio" inputmode="decimal" oninput="soloDecimales(this)" placeholder="0.00" required />
           </div>
           <div class="input-group">
-            <label>Cantidad inicial</label>
-            <input type="number" id="prod-stock" required />
+            <label>Cantidad inicial (solo enteros)</label>
+            <input type="text" id="prod-stock" inputmode="numeric" oninput="soloNumeros(this)" placeholder="100" required />
           </div>
         </div>
         <button type="submit" class="btn-primary btn-full">Guardar en Inventario</button>
