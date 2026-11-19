@@ -3,90 +3,82 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>RaízLocal — Comercio y Productores Cerca de Ti</title>
-  
-  <!-- Tipografía humana y moderna -->
+  <title>NexoLocal — Red de Comercio y Producción Cercana</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  
-  <!-- Iconos Lucide (limpios y profesionales) -->
   <script src="https://unpkg.com/lucide@latest"></script>
-  
-  <!-- Leaflet CSS (Listo para que tu compañero conecte el mapa) -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
 
-  <!-- ================= PANTALLA DE LOGIN / SELECCIÓN DE ROL ================= -->
+  <!-- ACCESO Y SELECCION DE PERFIL -->
   <div id="auth-overlay" class="auth-overlay">
     <div class="auth-card animate-pop">
       <div class="auth-brand">
-        <div class="brand-icon"><i data-lucide="sprout"></i></div>
+        <div class="brand-icon"><i data-lucide="compass"></i></div>
         <div>
-          <h1>RaízLocal</h1>
-          <p>Del productor y negocio local directo a tus manos</p>
+          <h1>NexoLocal</h1>
+          <p>Comercio de barrio y productores directos en un solo lugar</p>
         </div>
       </div>
 
       <div class="role-selector">
         <button type="button" class="role-btn active" data-role="comprador" onclick="seleccionarRolAuth('comprador')">
           <i data-lucide="shopping-bag"></i>
-          <span>Soy Comprador</span>
-          <small>Explorar mapa y pedir</small>
+          <span>Comprador</span>
+          <small>Explorar oferta cercana</small>
         </button>
         <button type="button" class="role-btn" data-role="vendedor" onclick="seleccionarRolAuth('vendedor')">
           <i data-lucide="store"></i>
-          <span>Soy Negocio / Productor</span>
+          <span>Negocio o Productor</span>
           <small>Inventario, pedidos y ventas</small>
         </button>
       </div>
 
       <form id="login-form" onsubmit="iniciarSesion(event)">
         <div class="input-group">
-          <label for="auth-nombre">Tu nombre o nombre del negocio</label>
-          <input type="text" id="auth-nombre" placeholder="Ej. Juan Pérez / Apiario El Roble" required />
+          <label for="auth-nombre">Nombre personal o comercial</label>
+          <input type="text" id="auth-nombre" placeholder="Ingresa tu nombre o el de tu negocio" required />
         </div>
         <div class="input-group">
-          <label for="auth-correo">Correo electrónico o teléfono</label>
-          <input type="text" id="auth-correo" placeholder="ejemplo@correo.com" required />
+          <label for="auth-correo">Correo o teléfono de contacto</label>
+          <input type="text" id="auth-correo" placeholder="contacto@ejemplo.com" required />
         </div>
         <button type="submit" class="btn-primary btn-full">
-          <span>Entrar a la plataforma</span>
+          <span>Ingresar</span>
           <i data-lucide="arrow-right"></i>
         </button>
       </form>
 
       <div class="demo-quick-access">
-        <span>Acceso rápido para pruebas:</span>
+        <span>Vista rápida sin registro:</span>
         <div class="demo-links">
-          <button type="button" onclick="accesoRapido('comprador')">Demo Comprador</button>
-          <button type="button" onclick="accesoRapido('vendedor')">Demo Negocio</button>
+          <button type="button" onclick="accesoRapido('comprador')">Entrar como Comprador</button>
+          <button type="button" onclick="accesoRapido('vendedor')">Entrar como Negocio</button>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- ================= BARRA DE NAVEGACIÓN PRINCIPAL ================= -->
+  <!-- BARRA SUPERIOR -->
   <header class="navbar">
     <div class="nav-left">
       <div class="logo">
-        <span class="logo-dot"></span>
-        <strong>RaízLocal</strong>
+        <span class="logo-mark"><i data-lucide="layers"></i></span>
+        <strong>NexoLocal</strong>
       </div>
-      <span id="nav-role-badge" class="role-badge">Modo Comprador</span>
+      <span id="nav-role-badge" class="role-badge">Comprador</span>
     </div>
 
     <div class="nav-right">
-      <!-- Switch rápido para cambiar de vista sin cerrar sesión (útil en la demo) -->
       <button id="btn-switch-role" class="btn-ghost" onclick="alternarVistaRapida()">
         <i data-lucide="repeat"></i>
         <span>Cambiar a Negocio</span>
       </button>
       
-      <div class="user-pill" onclick="cerrarSesion()" title="Cerrar sesión">
+      <div class="user-pill" onclick="cerrarSesion()" title="Cambiar cuenta">
         <div class="avatar" id="user-avatar">U</div>
         <span id="user-display-name">Usuario</span>
         <i data-lucide="log-out" class="icon-sm"></i>
@@ -94,186 +86,175 @@
     </div>
   </header>
 
-  <!-- ================= VISTA 1: MODO COMPRADOR ================= -->
+  <!-- VISTA COMPRADOR -->
   <main id="vista-comprador" class="main-container">
-    
-    <!-- Barra superior de filtros por categoría -->
     <section class="filters-bar">
       <div class="filter-chips" id="category-filters">
-        <button class="chip active" data-cat="todos">Todos los locales</button>
-        <button class="chip" data-cat="Alimentos">🍯 Campo y Miel</button>
-        <button class="chip" data-cat="Tiendita">🏪 Tienditas y Abarrotes</button>
-        <button class="chip" data-cat="Papeleria">✂️ Papelería y Mercería</button>
-        <button class="chip" data-cat="Artesanias">🏺 Artesanías</button>
+        <button class="chip active" data-cat="todos">
+          <i data-lucide="layout-grid"></i> Todos
+        </button>
+        <button class="chip" data-cat="produccion">
+          <i data-lucide="sprout"></i> Producción Local
+        </button>
+        <button class="chip" data-cat="comercio">
+          <i data-lucide="store"></i> Tiendas y Abarrotes
+        </button>
+        <button class="chip" data-cat="insumos">
+          <i data-lucide="package"></i> Insumos y Papelería
+        </button>
+        <button class="chip" data-cat="talleres">
+          <i data-lucide="hammer"></i> Talleres y Oficios
+        </button>
       </div>
       <div class="live-indicator">
-        <span class="pulse-green"></span>
-        <span>Inventario en tiempo real</span>
+        <span class="pulse-dot"></span>
+        <span>Existencias en tiempo real</span>
       </div>
     </section>
 
-    <!-- Grid principal: Mapa a la izquierda + Asistente IA a la derecha -->
     <div class="comprador-grid">
-      
-      <!-- Contenedor del Mapa (Para Integrante 2) -->
+      <!-- APARTADO PARA CONECTAR EL MAPA (LEAFLET + SUPABASE) -->
       <section class="map-wrapper card-surface">
         <div class="map-floating-header">
           <div class="search-box">
             <i data-lucide="search"></i>
-            <input type="text" id="map-search" placeholder="Buscar miel, cartulinas, queso..." />
+            <input type="text" id="map-search" placeholder="Buscar productos, insumos o negocios cercanos..." />
           </div>
           <select id="radius-filter" class="radius-select">
-            <option value="2">A menos de 2 km</option>
-            <option value="5" selected>A menos de 5 km</option>
-            <option value="15">Toda la ciudad</option>
+            <option value="2">Radio 2 km</option>
+            <option value="5" selected>Radio 5 km</option>
+            <option value="15">Toda la zona</option>
           </select>
         </div>
 
-        <!-- Aquí Leaflet pintará el mapa -->
         <div id="map" class="map-canvas">
-          <!-- Placeholder visual mientras tu compañero conecta Leaflet -->
-          <div class="map-placeholder">
-            <i data-lucide="map-pin" class="bounce-slow"></i>
-            <h3>Mapa Interactivo Listo</h3>
-            <p>Haz clic en una tienda de ejemplo abajo para probar el catálogo en vivo:</p>
-            <div class="mock-pins">
-              <button class="pin-demo" onclick="abrirDetalleTienda('Apiario El Roble', true)">
-                🍯 Apiario El Roble <span class="badge-verified">✓ Verificado</span>
-              </button>
-              <button class="pin-demo" onclick="abrirDetalleTienda('Papelería y Mercería Lupita', true)">
-                ✂️ Papelería Lupita <span class="badge-verified">✓ Verificado</span>
-              </button>
-            </div>
+          <div id="map-empty-state" class="map-placeholder">
+            <div class="placeholder-icon"><i data-lucide="map-pin"></i></div>
+            <h3>Contenedor de Mapa Listo</h3>
+            <p>Conecta la instancia de Leaflet en <code>app.js</code> para desplegar los puntos registrados en la base de datos.</p>
+            <button class="btn-outline-dark" onclick="abrirDetalleTienda()">
+              <i data-lucide="eye"></i> Vista previa de ficha de negocio
+            </button>
           </div>
         </div>
       </section>
 
-      <!-- Panel de Chatbot Comprador (Para Integrante 3 - TÚ) -->
+      <!-- APARTADO DE ASISTENTE CONVERSACIONAL COMPRADOR -->
       <aside class="chat-wrapper card-surface">
         <div class="chat-header">
           <div class="chat-title">
             <div class="ai-avatar"><i data-lucide="sparkles"></i></div>
             <div>
-              <h3>Asistente de Compras</h3>
-              <span>Encuentra productos y arma tu pedido</span>
+              <h3>Asistente de Búsqueda</h3>
+              <span>Consulta disponibilidad y arma pedidos locales</span>
             </div>
           </div>
         </div>
 
         <div id="chat-messages-comprador" class="chat-messages">
           <div class="msg msg-bot">
-            ¡Hola! Dime qué buscas hoy (ej. <em>"Quiero miel pura y queso artesanal cerca de mí"</em> o <em>"¿Qué papelería tiene cartulinas abiertas?"</em>) y te armo el pedido directo con el productor.
+            Indica qué productos o insumos necesitas y consultaré los negocios verificados cercanos con existencias disponibles.
           </div>
         </div>
 
         <div class="quick-prompts">
-          <button onclick="usarPromptRapido('¿Qué productores locales tienen miel o queso hoy?')">🍯 Miel y queso cerca</button>
-          <button onclick="usarPromptRapido('Necesito artículos de papelería urgentes')">✂️ Papelería cercana</button>
+          <button onclick="usarPromptRapido('¿Qué negocios tienen disponibilidad cerca de mi ubicación?')">
+            <i data-lucide="navigation"></i> Cercanos ahora
+          </button>
+          <button onclick="usarPromptRapido('Busco productores directos sin intermediarios')">
+            <i data-lucide="check-circle"></i> Productores directos
+          </button>
         </div>
 
         <form class="chat-input-area" onsubmit="enviarMensajeComprador(event)">
-          <input type="text" id="input-chat-comprador" placeholder="Escribe lo que necesitas..." autocomplete="off" />
-          <button type="submit" class="btn-send"><i data-lucide="send"></i></button>
+          <input type="text" id="input-chat-comprador" placeholder="Escribe tu consulta..." autocomplete="off" />
+          <button type="submit" class="btn-send" aria-label="Enviar"><i data-lucide="send"></i></button>
         </form>
       </aside>
-
     </div>
   </main>
 
-  <!-- ================= VISTA 2: MODO VENDEDOR / PEQUEÑO NEGOCIO ================= -->
+  <!-- VISTA NEGOCIO / PRODUCTOR -->
   <main id="vista-vendedor" class="main-container hidden">
-    
-    <!-- Encabezado del Negocio + Estatus de Verificación Humana -->
     <section class="seller-hero card-surface">
       <div class="seller-info">
         <div class="seller-title-row">
-          <h2 id="seller-business-name">Mi Negocio Local</h2>
+          <h2 id="seller-business-name">Panel de Negocio</h2>
           <span id="seller-verify-badge" class="status-unverified">
-            <i data-lucide="shield-alert"></i> Sin verificar
+            <i data-lucide="shield-alert"></i> Verificación pendiente
           </span>
         </div>
-        <p>Control de inventario, alertas de resurtido y pedidos en tiempo real.</p>
+        <p>Gestión de inventario, registro de entradas y salidas, y control de pedidos.</p>
       </div>
 
       <div class="seller-actions">
         <button class="btn-verify" onclick="abrirModalVerificacion()">
           <i data-lucide="scan-face"></i>
-          <span>Verificar Identidad Humana</span>
+          <span>Validar Identidad</span>
         </button>
         <button class="btn-primary" onclick="abrirModalNuevoProducto()">
           <i data-lucide="plus"></i>
-          <span>Agregar Producto</span>
+          <span>Nuevo Registro</span>
         </button>
       </div>
     </section>
 
-    <!-- Navegación interna del Vendedor -->
     <div class="seller-tabs">
       <button class="tab-btn active" onclick="cambiarTabVendedor('inventario', this)">
         <i data-lucide="package"></i> Inventario y Movimientos
       </button>
       <button class="tab-btn" onclick="cambiarTabVendedor('pedidos', this)">
-        <i data-lucide="clipboard-list"></i> Administración de Pedidos <span class="count-pill">2</span>
+        <i data-lucide="clipboard-list"></i> Administración de Pedidos <span id="badge-pedidos-count" class="count-pill">0</span>
       </button>
       <button class="tab-btn" onclick="cambiarTabVendedor('asistente-ia', this)">
-        <i data-lucide="bot"></i> Asistente IA de Negocio
+        <i data-lucide="cpu"></i> Asistente de Gestión
       </button>
     </div>
 
-    <!-- TAB A: INVENTARIO (ENTRADAS, SALIDAS Y ALERTAS) -->
+    <!-- SECCION INVENTARIO (CONECTAR CON TABLA PRODUCTOS Y MOVIMIENTOS) -->
     <section id="tab-inventario" class="seller-tab-content">
       <div class="kpi-grid">
         <div class="kpi-card card-surface">
-          <span>Productos Activos</span>
-          <strong>14</strong>
+          <span>Artículos Registrados</span>
+          <strong id="kpi-total-productos">0</strong>
         </div>
         <div class="kpi-card card-surface kpi-warning">
-          <span>Por Acabarse (Stock Bajo)</span>
-          <strong>2 productos</strong>
+          <span>Stock Crítico (Por agotarse)</span>
+          <strong id="kpi-stock-bajo">0</strong>
         </div>
         <div class="kpi-card card-surface">
-          <span>Movimientos Hoy</span>
-          <strong>+18 entradas / -9 salidas</strong>
+          <span>Flujo del Día</span>
+          <strong id="kpi-movimientos">0 movimientos</strong>
         </div>
       </div>
 
       <div class="card-surface table-container">
         <div class="section-header">
-          <h3>Inventario en Vivo (Sincronizado con el Mapa)</h3>
-          <span class="hint">Usa + y - para registrar entradas y salidas al instante</span>
+          <h3>Control de Existencias</h3>
+          <span class="hint">Sincronizado con la vista pública del mapa</span>
         </div>
         <table class="inventory-table">
           <thead>
             <tr>
-              <th>Producto</th>
+              <th>Artículo</th>
               <th>Categoría</th>
-              <th>Precio</th>
-              <th>Existencia</th>
+              <th>Precio Unitario</th>
+              <th>Stock Actual</th>
               <th>Estado</th>
               <th>Entradas / Salidas</th>
             </tr>
           </thead>
           <tbody id="tabla-inventario-body">
-            <tr>
-              <td><strong>Miel Pura de Mezquite 500g</strong></td>
-              <td>Alimentos</td>
-              <td>$135.00</td>
-              <td><span class="stock-num" id="stock-1">9</span> frascos</td>
-              <td><span class="badge-ok">Disponible</span></td>
+            <!-- Fila base de referencia; se reemplaza al conectar Supabase -->
+            <tr data-id="demo-1">
+              <td><strong>Artículo de Muestra</strong></td>
+              <td>General</td>
+              <td>$0.00</td>
+              <td><span class="stock-num" id="stock-demo-1">10</span> uds</td>
+              <td><span class="badge-ok">En existencia</span></td>
               <td class="kardex-controls">
-                <button class="btn-kardex minus" onclick="ajustarStock('stock-1', -1)" title="Registrar Salida / Venta">-1</button>
-                <button class="btn-kardex plus" onclick="ajustarStock('stock-1', 1)" title="Registrar Entrada / Surtido">+1</button>
-              </td>
-            </tr>
-            <tr class="row-low-stock">
-              <td><strong>Cartulina Blanca Pliego</strong></td>
-              <td>Papelería</td>
-              <td>$8.00</td>
-              <td><span class="stock-num" id="stock-2">3</span> pzas</td>
-              <td><span class="badge-danger">¡Se está acabando!</span></td>
-              <td class="kardex-controls">
-                <button class="btn-kardex minus" onclick="ajustarStock('stock-2', -1)">-1</button>
-                <button class="btn-kardex plus" onclick="ajustarStock('stock-2', 1)">+1</button>
+                <button class="btn-kardex minus" onclick="ajustarStock('demo-1', -1)" title="Registrar salida"><i data-lucide="minus"></i></button>
+                <button class="btn-kardex plus" onclick="ajustarStock('demo-1', 1)" title="Registrar entrada"><i data-lucide="plus"></i></button>
               </td>
             </tr>
           </tbody>
@@ -281,142 +262,140 @@
       </div>
     </section>
 
-    <!-- TAB B: ADMINISTRACIÓN DE PEDIDOS (CLIENTES Y PROVEEDORES) -->
+    <!-- SECCION PEDIDOS (CONECTAR CON TABLA PEDIDOS) -->
     <section id="tab-pedidos" class="seller-tab-content hidden">
       <div class="orders-split">
-        <!-- Pedidos de Clientes -->
         <div class="card-surface panel-box">
-          <h3><i data-lucide="shopping-cart"></i> Pedidos de Clientes (Por Despachar)</h3>
-          <div class="order-card">
-            <div class="order-top">
-              <strong>Pedido #104 — María González</strong>
-              <span class="badge-pending">Pendiente</span>
-            </div>
-            <p>2x Miel Pura de Mezquite 500g • Total: <strong>$270.00</strong></p>
-            <small>Modalidad: Pasa a recoger en 20 min</small>
-            <div class="order-btns">
-              <button class="btn-primary btn-sm" onclick="this.parentElement.parentElement.style.opacity='0.5'">Marcar Entregado y Descontar</button>
+          <h3><i data-lucide="shopping-cart"></i> Pedidos de Clientes</h3>
+          <div id="lista-pedidos-clientes" class="orders-list">
+            <div class="empty-box">
+              <i data-lucide="inbox"></i>
+              <p>Los pedidos generados desde el mapa o el chat aparecerán aquí para su despacho.</p>
             </div>
           </div>
         </div>
 
-        <!-- Pedidos a Proveedores (Resurtido automático) -->
         <div class="card-surface panel-box">
-          <h3><i data-lucide="truck"></i> Lista de Resurtido (Pedidos a Proveedor)</h3>
-          <p class="hint">Productos que bajaron de su stock mínimo:</p>
-          <div class="order-card alert-border">
-            <div class="order-top">
-              <strong>Cartulina Blanca Pliego</strong>
-              <span class="badge-danger">Quedan 3</span>
-            </div>
-            <p>Sugerencia de pedido: <strong>50 piezas</strong></p>
-            <div class="order-btns">
-              <button class="btn-whatsapp btn-sm">Pedir a Proveedor por WhatsApp</button>
-              <button class="btn-ghost btn-sm">Marcar Recibido (+50)</button>
+          <h3><i data-lucide="truck"></i> Reabastecimiento a Proveedores</h3>
+          <div id="lista-pedidos-proveedores" class="orders-list">
+            <div class="empty-box">
+              <i data-lucide="refresh-cw"></i>
+              <p>Los artículos que alcancen su mínimo de inventario se listarán aquí automáticamente.</p>
             </div>
           </div>
         </div>
       </div>
     </section>
 
-    <!-- TAB C: ASISTENTE IA DEL VENDEDOR -->
+    <!-- SECCION ASISTENTE IA VENDEDOR -->
     <section id="tab-asistente-ia" class="seller-tab-content hidden">
       <div class="card-surface seller-ai-box">
         <div class="chat-header">
           <div class="chat-title">
-            <div class="ai-avatar"><i data-lucide="wand-2"></i></div>
+            <div class="ai-avatar"><i data-lucide="sliders"></i></div>
             <div>
-              <h3>Copiloto IA de Inventario y Publicación</h3>
-              <span>Sube una foto para publicar o escribe tus ventas/entradas del día</span>
+              <h3>Asistente Operativo de Negocio</h3>
+              <span>Publica artículos mediante fotografía o registra entradas y salidas por texto</span>
             </div>
           </div>
         </div>
 
         <div id="chat-messages-vendedor" class="chat-messages">
           <div class="msg msg-bot">
-            ¡Listo para ayudarte! Puedes subir una <strong>foto de tu producto</strong> con su precio para publicarlo al instante en el mapa, o escribirme: <em>"Vendí 3 frascos de miel y llegaron 20 cartulinas"</em>.
+            Adjunta una imagen de tu mercancía para catalogarla automáticamente o escribe los movimientos de entrada y salida de tu turno.
           </div>
         </div>
 
         <form class="chat-input-area" onsubmit="enviarMensajeVendedor(event)">
-          <label class="btn-upload" title="Subir foto de producto">
+          <label class="btn-upload" title="Adjuntar fotografía">
             <i data-lucide="camera"></i>
             <input type="file" id="foto-producto-ia" accept="image/*" hidden />
           </label>
-          <input type="text" id="input-chat-vendedor" placeholder="Ej. Subir 10 frascos de miel a $135 o registrar venta..." />
-          <button type="submit" class="btn-send"><i data-lucide="send"></i></button>
+          <input type="text" id="input-chat-vendedor" placeholder="Describe el producto o movimiento a registrar..." />
+          <button type="submit" class="btn-send" aria-label="Enviar"><i data-lucide="send"></i></button>
         </form>
       </div>
     </section>
-
   </main>
 
-  <!-- ================= MODAL: CATÁLOGO DE TIENDA AL PICAR EN EL MAPA ================= -->
+  <!-- MODAL FICHA DE NEGOCIO -->
   <div id="modal-tienda" class="modal-backdrop hidden" onclick="cerrarModal('modal-tienda')">
     <div class="modal-card animate-pop" onclick="event.stopPropagation()">
       <div class="modal-header">
         <div>
-          <span class="badge-verified">✓ Negocio Verificado en Sitio</span>
-          <h2 id="modal-tienda-nombre">Nombre de la Tienda</h2>
-          <p id="modal-tienda-historia">Productor local verificado con entregas directas sin intermediarios.</p>
+          <span class="badge-verified"><i data-lucide="shield-check"></i> Negocio Verificado</span>
+          <h2 id="modal-tienda-nombre">Ficha del Establecimiento</h2>
+          <p id="modal-tienda-historia">Catálogo activo vinculado al inventario del local.</p>
         </div>
         <button class="btn-close" onclick="cerrarModal('modal-tienda')"><i data-lucide="x"></i></button>
       </div>
 
       <div class="modal-body">
-        <h4>Inventario Disponible en Tiempo Real</h4>
-        <div class="store-products-grid">
-          <div class="product-item">
-            <div class="product-info">
-              <strong>Miel Pura de Mezquite 500g</strong>
-              <span class="live-stock-tag">● Quedan 9 disponibles</span>
-              <p>$135.00 MXN</p>
-            </div>
-            <button class="btn-whatsapp btn-sm" onclick="pedirDirectoWhatsApp('Miel Pura de Mezquite', 135)">
-              Pedir ahora
-            </button>
-          </div>
-          <div class="product-item">
-            <div class="product-info">
-              <strong>Polen Natural de Sierra 250g</strong>
-              <span class="live-stock-tag">● Quedan 4 disponibles</span>
-              <p>$95.00 MXN</p>
-            </div>
-            <button class="btn-whatsapp btn-sm" onclick="pedirDirectoWhatsApp('Polen Natural', 95)">
-              Pedir ahora
-            </button>
+        <h4>Disponibilidad Actual</h4>
+        <div id="modal-tienda-productos" class="store-products-grid">
+          <div class="empty-box">
+            <p>Conecta la consulta de productos por <code>negocio_id</code> para listar el catálogo real.</p>
           </div>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- ================= MODAL: VERIFICACIÓN HUMANA ANTI-ESTAFA ================= -->
+  <!-- MODAL VERIFICACION HUMANA -->
   <div id="modal-verificacion" class="modal-backdrop hidden" onclick="cerrarModal('modal-verificacion')">
     <div class="modal-card animate-pop" onclick="event.stopPropagation()">
       <div class="modal-header">
         <div>
-          <h2>Verificación Humana y GPS</h2>
-          <p>Protegemos a los compradores asegurando que tu negocio es real.</p>
+          <h2>Validación de Autenticidad</h2>
+          <p>Verificación visual en sitio para garantizar seguridad a los compradores.</p>
         </div>
         <button class="btn-close" onclick="cerrarModal('modal-verificacion')"><i data-lucide="x"></i></button>
       </div>
       <div class="modal-body verify-body">
         <div class="challenge-box">
-          <span>Reto aleatorio en vivo:</span>
-          <strong id="reto-texto">"Tómate una selfie frente a tu mercancía mostrando 3 dedos"</strong>
+          <span>Instrucción de prueba de vida:</span>
+          <strong id="reto-texto">Captura una fotografía frente a tu espacio de trabajo</strong>
         </div>
         <label class="camera-dropzone">
           <i data-lucide="camera"></i>
-          <span>Tocar para abrir cámara y capturar prueba</span>
-          <input type="file" accept="image/*" capture="user" onchange="simularVerificacionIA(this)" hidden />
+          <span>Activar cámara y enviar captura</span>
+          <input type="file" accept="image/*" capture="user" onchange="procesarVerificacion(this)" hidden />
         </label>
         <p id="verify-status-text" class="hint"></p>
       </div>
     </div>
   </div>
 
-  <!-- Scripts -->
+  <!-- MODAL ALTA MANUAL DE ARTICULO -->
+  <div id="modal-nuevo-producto" class="modal-backdrop hidden" onclick="cerrarModal('modal-nuevo-producto')">
+    <div class="modal-card animate-pop" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <div>
+          <h2>Registrar Artículo</h2>
+          <p>Alta directa en el inventario del establecimiento.</p>
+        </div>
+        <button class="btn-close" onclick="cerrarModal('modal-nuevo-producto')"><i data-lucide="x"></i></button>
+      </div>
+      <form onsubmit="guardarProductoManual(event)">
+        <div class="input-group">
+          <label>Nombre del artículo</label>
+          <input type="text" id="prod-nombre" required />
+        </div>
+        <div class="form-row">
+          <div class="input-group">
+            <label>Precio ($)</label>
+            <input type="number" id="prod-precio" step="0.01" required />
+          </div>
+          <div class="input-group">
+            <label>Cantidad inicial</label>
+            <input type="number" id="prod-stock" required />
+          </div>
+        </div>
+        <button type="submit" class="btn-primary btn-full">Guardar en Inventario</button>
+      </form>
+    </div>
+  </div>
+
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="app.js"></script>
 </body>
