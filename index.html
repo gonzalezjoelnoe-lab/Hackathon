@@ -1,1 +1,423 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RaízLocal — Comercio y Productores Cerca de Ti</title>
+  
+  <!-- Tipografía humana y moderna -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <!-- Iconos Lucide (limpios y profesionales) -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  
+  <!-- Leaflet CSS (Listo para que tu compañero conecte el mapa) -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
 
+  <!-- ================= PANTALLA DE LOGIN / SELECCIÓN DE ROL ================= -->
+  <div id="auth-overlay" class="auth-overlay">
+    <div class="auth-card animate-pop">
+      <div class="auth-brand">
+        <div class="brand-icon"><i data-lucide="sprout"></i></div>
+        <div>
+          <h1>RaízLocal</h1>
+          <p>Del productor y negocio local directo a tus manos</p>
+        </div>
+      </div>
+
+      <div class="role-selector">
+        <button type="button" class="role-btn active" data-role="comprador" onclick="seleccionarRolAuth('comprador')">
+          <i data-lucide="shopping-bag"></i>
+          <span>Soy Comprador</span>
+          <small>Explorar mapa y pedir</small>
+        </button>
+        <button type="button" class="role-btn" data-role="vendedor" onclick="seleccionarRolAuth('vendedor')">
+          <i data-lucide="store"></i>
+          <span>Soy Negocio / Productor</span>
+          <small>Inventario, pedidos y ventas</small>
+        </button>
+      </div>
+
+      <form id="login-form" onsubmit="iniciarSesion(event)">
+        <div class="input-group">
+          <label for="auth-nombre">Tu nombre o nombre del negocio</label>
+          <input type="text" id="auth-nombre" placeholder="Ej. Juan Pérez / Apiario El Roble" required />
+        </div>
+        <div class="input-group">
+          <label for="auth-correo">Correo electrónico o teléfono</label>
+          <input type="text" id="auth-correo" placeholder="ejemplo@correo.com" required />
+        </div>
+        <button type="submit" class="btn-primary btn-full">
+          <span>Entrar a la plataforma</span>
+          <i data-lucide="arrow-right"></i>
+        </button>
+      </form>
+
+      <div class="demo-quick-access">
+        <span>Acceso rápido para pruebas:</span>
+        <div class="demo-links">
+          <button type="button" onclick="accesoRapido('comprador')">Demo Comprador</button>
+          <button type="button" onclick="accesoRapido('vendedor')">Demo Negocio</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= BARRA DE NAVEGACIÓN PRINCIPAL ================= -->
+  <header class="navbar">
+    <div class="nav-left">
+      <div class="logo">
+        <span class="logo-dot"></span>
+        <strong>RaízLocal</strong>
+      </div>
+      <span id="nav-role-badge" class="role-badge">Modo Comprador</span>
+    </div>
+
+    <div class="nav-right">
+      <!-- Switch rápido para cambiar de vista sin cerrar sesión (útil en la demo) -->
+      <button id="btn-switch-role" class="btn-ghost" onclick="alternarVistaRapida()">
+        <i data-lucide="repeat"></i>
+        <span>Cambiar a Negocio</span>
+      </button>
+      
+      <div class="user-pill" onclick="cerrarSesion()" title="Cerrar sesión">
+        <div class="avatar" id="user-avatar">U</div>
+        <span id="user-display-name">Usuario</span>
+        <i data-lucide="log-out" class="icon-sm"></i>
+      </div>
+    </div>
+  </header>
+
+  <!-- ================= VISTA 1: MODO COMPRADOR ================= -->
+  <main id="vista-comprador" class="main-container">
+    
+    <!-- Barra superior de filtros por categoría -->
+    <section class="filters-bar">
+      <div class="filter-chips" id="category-filters">
+        <button class="chip active" data-cat="todos">Todos los locales</button>
+        <button class="chip" data-cat="Alimentos">🍯 Campo y Miel</button>
+        <button class="chip" data-cat="Tiendita">🏪 Tienditas y Abarrotes</button>
+        <button class="chip" data-cat="Papeleria">✂️ Papelería y Mercería</button>
+        <button class="chip" data-cat="Artesanias">🏺 Artesanías</button>
+      </div>
+      <div class="live-indicator">
+        <span class="pulse-green"></span>
+        <span>Inventario en tiempo real</span>
+      </div>
+    </section>
+
+    <!-- Grid principal: Mapa a la izquierda + Asistente IA a la derecha -->
+    <div class="comprador-grid">
+      
+      <!-- Contenedor del Mapa (Para Integrante 2) -->
+      <section class="map-wrapper card-surface">
+        <div class="map-floating-header">
+          <div class="search-box">
+            <i data-lucide="search"></i>
+            <input type="text" id="map-search" placeholder="Buscar miel, cartulinas, queso..." />
+          </div>
+          <select id="radius-filter" class="radius-select">
+            <option value="2">A menos de 2 km</option>
+            <option value="5" selected>A menos de 5 km</option>
+            <option value="15">Toda la ciudad</option>
+          </select>
+        </div>
+
+        <!-- Aquí Leaflet pintará el mapa -->
+        <div id="map" class="map-canvas">
+          <!-- Placeholder visual mientras tu compañero conecta Leaflet -->
+          <div class="map-placeholder">
+            <i data-lucide="map-pin" class="bounce-slow"></i>
+            <h3>Mapa Interactivo Listo</h3>
+            <p>Haz clic en una tienda de ejemplo abajo para probar el catálogo en vivo:</p>
+            <div class="mock-pins">
+              <button class="pin-demo" onclick="abrirDetalleTienda('Apiario El Roble', true)">
+                🍯 Apiario El Roble <span class="badge-verified">✓ Verificado</span>
+              </button>
+              <button class="pin-demo" onclick="abrirDetalleTienda('Papelería y Mercería Lupita', true)">
+                ✂️ Papelería Lupita <span class="badge-verified">✓ Verificado</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Panel de Chatbot Comprador (Para Integrante 3 - TÚ) -->
+      <aside class="chat-wrapper card-surface">
+        <div class="chat-header">
+          <div class="chat-title">
+            <div class="ai-avatar"><i data-lucide="sparkles"></i></div>
+            <div>
+              <h3>Asistente de Compras</h3>
+              <span>Encuentra productos y arma tu pedido</span>
+            </div>
+          </div>
+        </div>
+
+        <div id="chat-messages-comprador" class="chat-messages">
+          <div class="msg msg-bot">
+            ¡Hola! Dime qué buscas hoy (ej. <em>"Quiero miel pura y queso artesanal cerca de mí"</em> o <em>"¿Qué papelería tiene cartulinas abiertas?"</em>) y te armo el pedido directo con el productor.
+          </div>
+        </div>
+
+        <div class="quick-prompts">
+          <button onclick="usarPromptRapido('¿Qué productores locales tienen miel o queso hoy?')">🍯 Miel y queso cerca</button>
+          <button onclick="usarPromptRapido('Necesito artículos de papelería urgentes')">✂️ Papelería cercana</button>
+        </div>
+
+        <form class="chat-input-area" onsubmit="enviarMensajeComprador(event)">
+          <input type="text" id="input-chat-comprador" placeholder="Escribe lo que necesitas..." autocomplete="off" />
+          <button type="submit" class="btn-send"><i data-lucide="send"></i></button>
+        </form>
+      </aside>
+
+    </div>
+  </main>
+
+  <!-- ================= VISTA 2: MODO VENDEDOR / PEQUEÑO NEGOCIO ================= -->
+  <main id="vista-vendedor" class="main-container hidden">
+    
+    <!-- Encabezado del Negocio + Estatus de Verificación Humana -->
+    <section class="seller-hero card-surface">
+      <div class="seller-info">
+        <div class="seller-title-row">
+          <h2 id="seller-business-name">Mi Negocio Local</h2>
+          <span id="seller-verify-badge" class="status-unverified">
+            <i data-lucide="shield-alert"></i> Sin verificar
+          </span>
+        </div>
+        <p>Control de inventario, alertas de resurtido y pedidos en tiempo real.</p>
+      </div>
+
+      <div class="seller-actions">
+        <button class="btn-verify" onclick="abrirModalVerificacion()">
+          <i data-lucide="scan-face"></i>
+          <span>Verificar Identidad Humana</span>
+        </button>
+        <button class="btn-primary" onclick="abrirModalNuevoProducto()">
+          <i data-lucide="plus"></i>
+          <span>Agregar Producto</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- Navegación interna del Vendedor -->
+    <div class="seller-tabs">
+      <button class="tab-btn active" onclick="cambiarTabVendedor('inventario', this)">
+        <i data-lucide="package"></i> Inventario y Movimientos
+      </button>
+      <button class="tab-btn" onclick="cambiarTabVendedor('pedidos', this)">
+        <i data-lucide="clipboard-list"></i> Administración de Pedidos <span class="count-pill">2</span>
+      </button>
+      <button class="tab-btn" onclick="cambiarTabVendedor('asistente-ia', this)">
+        <i data-lucide="bot"></i> Asistente IA de Negocio
+      </button>
+    </div>
+
+    <!-- TAB A: INVENTARIO (ENTRADAS, SALIDAS Y ALERTAS) -->
+    <section id="tab-inventario" class="seller-tab-content">
+      <div class="kpi-grid">
+        <div class="kpi-card card-surface">
+          <span>Productos Activos</span>
+          <strong>14</strong>
+        </div>
+        <div class="kpi-card card-surface kpi-warning">
+          <span>Por Acabarse (Stock Bajo)</span>
+          <strong>2 productos</strong>
+        </div>
+        <div class="kpi-card card-surface">
+          <span>Movimientos Hoy</span>
+          <strong>+18 entradas / -9 salidas</strong>
+        </div>
+      </div>
+
+      <div class="card-surface table-container">
+        <div class="section-header">
+          <h3>Inventario en Vivo (Sincronizado con el Mapa)</h3>
+          <span class="hint">Usa + y - para registrar entradas y salidas al instante</span>
+        </div>
+        <table class="inventory-table">
+          <thead>
+            <tr>
+              <th>Producto</th>
+              <th>Categoría</th>
+              <th>Precio</th>
+              <th>Existencia</th>
+              <th>Estado</th>
+              <th>Entradas / Salidas</th>
+            </tr>
+          </thead>
+          <tbody id="tabla-inventario-body">
+            <tr>
+              <td><strong>Miel Pura de Mezquite 500g</strong></td>
+              <td>Alimentos</td>
+              <td>$135.00</td>
+              <td><span class="stock-num" id="stock-1">9</span> frascos</td>
+              <td><span class="badge-ok">Disponible</span></td>
+              <td class="kardex-controls">
+                <button class="btn-kardex minus" onclick="ajustarStock('stock-1', -1)" title="Registrar Salida / Venta">-1</button>
+                <button class="btn-kardex plus" onclick="ajustarStock('stock-1', 1)" title="Registrar Entrada / Surtido">+1</button>
+              </td>
+            </tr>
+            <tr class="row-low-stock">
+              <td><strong>Cartulina Blanca Pliego</strong></td>
+              <td>Papelería</td>
+              <td>$8.00</td>
+              <td><span class="stock-num" id="stock-2">3</span> pzas</td>
+              <td><span class="badge-danger">¡Se está acabando!</span></td>
+              <td class="kardex-controls">
+                <button class="btn-kardex minus" onclick="ajustarStock('stock-2', -1)">-1</button>
+                <button class="btn-kardex plus" onclick="ajustarStock('stock-2', 1)">+1</button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- TAB B: ADMINISTRACIÓN DE PEDIDOS (CLIENTES Y PROVEEDORES) -->
+    <section id="tab-pedidos" class="seller-tab-content hidden">
+      <div class="orders-split">
+        <!-- Pedidos de Clientes -->
+        <div class="card-surface panel-box">
+          <h3><i data-lucide="shopping-cart"></i> Pedidos de Clientes (Por Despachar)</h3>
+          <div class="order-card">
+            <div class="order-top">
+              <strong>Pedido #104 — María González</strong>
+              <span class="badge-pending">Pendiente</span>
+            </div>
+            <p>2x Miel Pura de Mezquite 500g • Total: <strong>$270.00</strong></p>
+            <small>Modalidad: Pasa a recoger en 20 min</small>
+            <div class="order-btns">
+              <button class="btn-primary btn-sm" onclick="this.parentElement.parentElement.style.opacity='0.5'">Marcar Entregado y Descontar</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Pedidos a Proveedores (Resurtido automático) -->
+        <div class="card-surface panel-box">
+          <h3><i data-lucide="truck"></i> Lista de Resurtido (Pedidos a Proveedor)</h3>
+          <p class="hint">Productos que bajaron de su stock mínimo:</p>
+          <div class="order-card alert-border">
+            <div class="order-top">
+              <strong>Cartulina Blanca Pliego</strong>
+              <span class="badge-danger">Quedan 3</span>
+            </div>
+            <p>Sugerencia de pedido: <strong>50 piezas</strong></p>
+            <div class="order-btns">
+              <button class="btn-whatsapp btn-sm">Pedir a Proveedor por WhatsApp</button>
+              <button class="btn-ghost btn-sm">Marcar Recibido (+50)</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB C: ASISTENTE IA DEL VENDEDOR -->
+    <section id="tab-asistente-ia" class="seller-tab-content hidden">
+      <div class="card-surface seller-ai-box">
+        <div class="chat-header">
+          <div class="chat-title">
+            <div class="ai-avatar"><i data-lucide="wand-2"></i></div>
+            <div>
+              <h3>Copiloto IA de Inventario y Publicación</h3>
+              <span>Sube una foto para publicar o escribe tus ventas/entradas del día</span>
+            </div>
+          </div>
+        </div>
+
+        <div id="chat-messages-vendedor" class="chat-messages">
+          <div class="msg msg-bot">
+            ¡Listo para ayudarte! Puedes subir una <strong>foto de tu producto</strong> con su precio para publicarlo al instante en el mapa, o escribirme: <em>"Vendí 3 frascos de miel y llegaron 20 cartulinas"</em>.
+          </div>
+        </div>
+
+        <form class="chat-input-area" onsubmit="enviarMensajeVendedor(event)">
+          <label class="btn-upload" title="Subir foto de producto">
+            <i data-lucide="camera"></i>
+            <input type="file" id="foto-producto-ia" accept="image/*" hidden />
+          </label>
+          <input type="text" id="input-chat-vendedor" placeholder="Ej. Subir 10 frascos de miel a $135 o registrar venta..." />
+          <button type="submit" class="btn-send"><i data-lucide="send"></i></button>
+        </form>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ================= MODAL: CATÁLOGO DE TIENDA AL PICAR EN EL MAPA ================= -->
+  <div id="modal-tienda" class="modal-backdrop hidden" onclick="cerrarModal('modal-tienda')">
+    <div class="modal-card animate-pop" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <div>
+          <span class="badge-verified">✓ Negocio Verificado en Sitio</span>
+          <h2 id="modal-tienda-nombre">Nombre de la Tienda</h2>
+          <p id="modal-tienda-historia">Productor local verificado con entregas directas sin intermediarios.</p>
+        </div>
+        <button class="btn-close" onclick="cerrarModal('modal-tienda')"><i data-lucide="x"></i></button>
+      </div>
+
+      <div class="modal-body">
+        <h4>Inventario Disponible en Tiempo Real</h4>
+        <div class="store-products-grid">
+          <div class="product-item">
+            <div class="product-info">
+              <strong>Miel Pura de Mezquite 500g</strong>
+              <span class="live-stock-tag">● Quedan 9 disponibles</span>
+              <p>$135.00 MXN</p>
+            </div>
+            <button class="btn-whatsapp btn-sm" onclick="pedirDirectoWhatsApp('Miel Pura de Mezquite', 135)">
+              Pedir ahora
+            </button>
+          </div>
+          <div class="product-item">
+            <div class="product-info">
+              <strong>Polen Natural de Sierra 250g</strong>
+              <span class="live-stock-tag">● Quedan 4 disponibles</span>
+              <p>$95.00 MXN</p>
+            </div>
+            <button class="btn-whatsapp btn-sm" onclick="pedirDirectoWhatsApp('Polen Natural', 95)">
+              Pedir ahora
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= MODAL: VERIFICACIÓN HUMANA ANTI-ESTAFA ================= -->
+  <div id="modal-verificacion" class="modal-backdrop hidden" onclick="cerrarModal('modal-verificacion')">
+    <div class="modal-card animate-pop" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <div>
+          <h2>Verificación Humana y GPS</h2>
+          <p>Protegemos a los compradores asegurando que tu negocio es real.</p>
+        </div>
+        <button class="btn-close" onclick="cerrarModal('modal-verificacion')"><i data-lucide="x"></i></button>
+      </div>
+      <div class="modal-body verify-body">
+        <div class="challenge-box">
+          <span>Reto aleatorio en vivo:</span>
+          <strong id="reto-texto">"Tómate una selfie frente a tu mercancía mostrando 3 dedos"</strong>
+        </div>
+        <label class="camera-dropzone">
+          <i data-lucide="camera"></i>
+          <span>Tocar para abrir cámara y capturar prueba</span>
+          <input type="file" accept="image/*" capture="user" onchange="simularVerificacionIA(this)" hidden />
+        </label>
+        <p id="verify-status-text" class="hint"></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
