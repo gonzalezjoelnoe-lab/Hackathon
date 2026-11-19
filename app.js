@@ -57,10 +57,15 @@ const DB_HOOKS = {
 /* =========================================================
    APARTADO DE CONEXION AL MAPA (LEAFLET)
    ========================================================= */
-const MAP_HOOKS = {
+const MAP_HOOKS =  {
   mapInstance: null,
   inicializar() {
     // Integrante de Mapa: inicializar L.map('map') aquí
+    const map = L.map('map').setView([24.0298, -104.6506], 15);
+
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '&copy; OpenStreetMap contributors'
+}).addTo(map);
   },
   filtrarPorCategoria(categoria) {
     console.log('Filtrar marcadores por:', categoria);
