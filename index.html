@@ -37,21 +37,44 @@
         </button>
       </div>
 
-      <form id="login-form" onsubmit="iniciarSesion(event)">
-        <div class="input-group">
-          <label for="auth-nombre">Nombre personal o comercial</label>
-          <input type="text" id="auth-nombre" placeholder="Ingresa tu nombre o el de tu negocio" required />
-        </div>
-        <div class="input-group">
-          <label for="auth-correo">Correo o teléfono de contacto</label>
-          <input type="text" id="auth-correo" placeholder="contacto@ejemplo.com" required />
-        </div>
-        <button type="submit" class="btn-primary btn-full">
-          <span>Ingresar</span>
-          <i data-lucide="arrow-right"></i>
-        </button>
-      </form>
-
+     
+     <form id="login-form" onsubmit="iniciarSesion(event)">
+  <div id="grupo-nombre" class="input-group hidden">
+    <label for="auth-nombre" id="label-nombre">Tu nombre</label>
+    <input type="text" id="auth-nombre" placeholder="Nombre personal o comercial" />
+  </div>
+  <div id="grupo-negocio" class="hidden">
+    <div class="input-group">
+      <label for="auth-giro">Giro del negocio</label>
+      <select id="auth-giro" style="width:100%">
+        <option value="produccion">Producción Local</option>
+        <option value="comercio">Tiendas y Abarrotes</option>
+        <option value="insumos">Insumos y Papelería</option>
+        <option value="talleres">Talleres y Oficios</option>
+      </select>
+    </div>
+    <div class="input-group">
+      <label for="auth-whatsapp">WhatsApp del negocio (con lada de país)</label>
+      <input type="tel" id="auth-whatsapp" placeholder="52 + 10 dígitos" />
+    </div>
+  </div>
+  <div class="input-group">
+    <label for="auth-correo">Correo electrónico</label>
+    <input type="email" id="auth-correo" placeholder="contacto@ejemplo.com" required />
+  </div>
+  <div class="input-group">
+    <label for="auth-password">Contraseña</label>
+    <input type="password" id="auth-password" placeholder="Mínimo 6 caracteres" minlength="6" required />
+  </div>
+  <p id="auth-error" class="hint" style="min-height:1.2em"></p>
+  <button type="submit" id="auth-submit" class="btn-primary btn-full">
+    <span id="auth-submit-texto">Ingresar</span>
+    <i data-lucide="arrow-right"></i>
+  </button>
+  <button type="button" id="auth-toggle" class="btn-ghost btn-full" onclick="cambiarModoAuth()">¿No tienes cuenta? Crear una</button>
+</form>
+   
+       
       <div class="demo-quick-access">
         <span>Vista rápida sin registro:</span>
         <div class="demo-links">
