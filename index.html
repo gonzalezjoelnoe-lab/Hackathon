@@ -37,7 +37,7 @@
         </div>
         <div class="input-group">
           <label for="login-password">Contraseña</label>
-          <input type="password" id="login-password" placeholder="Ingresa tu contraseña" required />
+          <input type="password" id="login-password" maxlength="10" placeholder="Ingresa tu contraseña" required />
         </div>
         <p id="auth-error-msg" class="auth-error hidden"></p>
         <button type="submit" class="btn-primary btn-full">
@@ -71,10 +71,10 @@
             <div class="input-group">
               <label for="reg-giro">Giro del negocio</label>
               <select id="reg-giro" class="select-field">
-                <option value="produccion">Producción Local</option>
-                <option value="comercio">Tiendas y Abarrotes</option>
-                <option value="insumos">Insumos y Papelería</option>
-                <option value="talleres">Talleres y Oficios</option>
+                <option value="Producción Local">Producción Local</option>
+                <option value="Tiendas y Abarrotes">Tiendas y Abarrotes</option>
+                <option value="Insumos y Papelería">Insumos y Papelería</option>
+                <option value="Talleres y Oficios">Talleres y Oficios</option>
               </select>
             </div>
             <div class="input-group">
@@ -90,8 +90,21 @@
         </div>
 
         <div class="input-group">
-          <label for="reg-password">Crea una contraseña</label>
-          <input type="password" id="reg-password" minlength="4" placeholder="Mínimo 4 caracteres" required />
+          <label for="reg-password">Crea una contraseña (8 a 10 caracteres)</label>
+          <input
+            type="password"
+            id="reg-password"
+            minlength="8"
+            maxlength="10"
+            oninput="validarPasswordEnVivo(this.value)"
+            placeholder="Ej. Nexo#2026"
+            required
+          />
+          <div class="password-rules" id="password-rules">
+            <span id="rule-len" class="rule-item"><i data-lucide="circle"></i> 8 a 10 caracteres</span>
+            <span id="rule-num" class="rule-item"><i data-lucide="circle"></i> Al menos 1 número</span>
+            <span id="rule-sym" class="rule-item"><i data-lucide="circle"></i> 1 carácter especial (!@#$...)</span>
+          </div>
         </div>
 
         <p id="reg-error-msg" class="auth-error hidden"></p>
@@ -140,10 +153,10 @@
     <section class="filters-bar">
       <div class="filter-chips" id="category-filters">
         <button class="chip active" data-cat="todos"><i data-lucide="layout-grid"></i> Todos</button>
-        <button class="chip" data-cat="produccion"><i data-lucide="sprout"></i> Producción Local</button>
-        <button class="chip" data-cat="comercio"><i data-lucide="store"></i> Tiendas y Abarrotes</button>
-        <button class="chip" data-cat="insumos"><i data-lucide="package"></i> Insumos y Papelería</button>
-        <button class="chip" data-cat="talleres"><i data-lucide="hammer"></i> Talleres y Oficios</button>
+        <button class="chip" data-cat="Producción Local"><i data-lucide="sprout"></i> Producción Local</button>
+        <button class="chip" data-cat="Tiendas y Abarrotes"><i data-lucide="store"></i> Tiendas y Abarrotes</button>
+        <button class="chip" data-cat="Insumos y Papelería"><i data-lucide="package"></i> Insumos y Papelería</button>
+        <button class="chip" data-cat="Talleres y Oficios"><i data-lucide="hammer"></i> Talleres y Oficios</button>
       </div>
       <div class="live-indicator">
         <span class="pulse-dot"></span>
@@ -151,8 +164,13 @@
       </div>
     </section>
 
+    <!-- BARRA DINAMICA DE SUBCATEGORIAS -->
+    <section id="subcategory-bar" class="subfilters-bar hidden">
+      <span class="subfilter-label">Subcategoría:</span>
+      <div class="filter-chips" id="subcategory-filters"></div>
+    </section>
+
     <div class="comprador-grid">
-      <!-- APARTADO PARA MAPA (LEAFLET + SUPABASE) -->
       <section class="map-wrapper card-surface">
         <div class="map-floating-header">
           <div class="search-box">
@@ -178,7 +196,6 @@
         </div>
       </section>
 
-      <!-- ASISTENTE CONVERSACIONAL COMPRADOR -->
       <aside class="chat-wrapper card-surface">
         <div class="chat-header">
           <div class="chat-title">
@@ -261,9 +278,17 @@
           <span>Stock Crítico (5 o menos)</span>
           <strong id="kpi-stock-bajo">0</strong>
         </div>
-        <div class="kpi-card card-surface">
-          <span>Flujo del Turno</span>
-          <strong id="kpi-movimientos">0 uds movidas</strong>
+        <!-- RECTANGULO DIVIDIDO EN ENTRADAS Y SALIDAS -->
+        <div class="kpi-card card-surface kpi-split">
+          <div class="kpi-half">
+            <span><i data-lucide="arrow-down-left" class="icon-sm"></i> Entradas</span>
+            <strong id="kpi-entradas" class="text-entrada">0 uds</strong>
+          </div>
+          <div class="kpi-divider"></div>
+          <div class="kpi-half">
+            <span><i data-lucide="arrow-up-right" class="icon-sm"></i> Salidas</span>
+            <strong id="kpi-salidas" class="text-salida">0 uds</strong>
+          </div>
         </div>
       </div>
 
@@ -276,16 +301,14 @@
           <thead>
             <tr>
               <th>Artículo</th>
-              <th>Categoría</th>
+              <th>Categoría y Subcategoría</th>
               <th>Precio Unitario</th>
               <th>Stock Actual</th>
               <th>Estado</th>
               <th>Registrar Salida / Entrada</th>
             </tr>
           </thead>
-          <tbody id="tabla-inventario-body">
-            <!-- Filas generadas dinámicamente -->
-          </tbody>
+          <tbody id="tabla-inventario-body"></tbody>
         </table>
       </div>
     </section>
@@ -374,7 +397,7 @@
     </div>
   </div>
 
-  <!-- MODAL VERIFICACION HUMANA REAL CON GEMINI VISION -->
+  <!-- MODAL VERIFICACION HUMANA -->
   <div id="modal-verificacion" class="modal-backdrop hidden" onclick="cerrarModal('modal-verificacion')">
     <div class="modal-card animate-pop" onclick="event.stopPropagation()">
       <div class="modal-header">
@@ -399,7 +422,7 @@
     </div>
   </div>
 
-  <!-- MODAL ALTA MANUAL DE ARTICULO -->
+  <!-- MODAL ALTA MANUAL DE ARTICULO CON CATEGORIA Y SUBCATEGORIA -->
   <div id="modal-nuevo-producto" class="modal-backdrop hidden" onclick="cerrarModal('modal-nuevo-producto')">
     <div class="modal-card animate-pop" onclick="event.stopPropagation()">
       <div class="modal-header">
@@ -414,14 +437,20 @@
           <label>Nombre del artículo</label>
           <input type="text" id="prod-nombre" required />
         </div>
-        <div class="input-group">
-          <label>Categoría</label>
-          <select id="prod-categoria" class="select-field">
-            <option value="Producción Local">Producción Local</option>
-            <option value="Tiendas y Abarrotes">Tiendas y Abarrotes</option>
-            <option value="Insumos y Papelería">Insumos y Papelería</option>
-            <option value="Talleres y Oficios">Talleres y Oficios</option>
-          </select>
+        <div class="form-row">
+          <div class="input-group">
+            <label>Categoría</label>
+            <select id="prod-categoria" class="select-field" onchange="actualizarSubcategoriasModal(this.value)">
+              <option value="Producción Local">Producción Local</option>
+              <option value="Tiendas y Abarrotes">Tiendas y Abarrotes</option>
+              <option value="Insumos y Papelería">Insumos y Papelería</option>
+              <option value="Talleres y Oficios">Talleres y Oficios</option>
+            </select>
+          </div>
+          <div class="input-group">
+            <label>Subcategoría</label>
+            <select id="prod-subcategoria" class="select-field"></select>
+          </div>
         </div>
         <div class="form-row">
           <div class="input-group">
@@ -438,9 +467,8 @@
     </div>
   </div>
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js"></script>
-
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="app.js"></script>
 </body>
 </html>
