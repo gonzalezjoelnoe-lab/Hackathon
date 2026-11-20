@@ -770,14 +770,12 @@ const MAP_HOOKS = {
   
 configurarControles() {
 
-    // BUSCADOR
     const buscador = document.getElementById('map-search');
 
     buscador?.addEventListener('input', e => {
       this.buscar(e.target.value);
     });
 
-    // FILTRO POR RADIO
     const radio = document.getElementById('map-radius');
 
     radio?.addEventListener('change', e => {
@@ -785,29 +783,12 @@ configurarControles() {
       this.aplicarFiltros();
     });
 
-    // UBICACIÓN GPS
     const gps = document.getElementById('map-my-location');
 
     gps?.addEventListener('click', () => {
       this.localizarUsuario();
     });
 
-    // FILTROS POR CATEGORÍA
-    document.querySelectorAll('[data-cat]').forEach(boton => {
-
-      boton.addEventListener('click', () => {
-
-        this.filtrarPorCategoria(boton.dataset.cat);
-        
-
-        // Marcar visualmente el botón seleccionado
-        document.querySelectorAll('[data-cat]').forEach(b => {
-          b.classList.remove('active');
-          });
-
-        boton.classList.add('active');
-
-      });
 },
 
 
