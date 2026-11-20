@@ -792,25 +792,6 @@ configurarControles() {
 },
 
 
-    const gps = document.getElementById('map-my-location');
-
-    if (gps) {
-      gps.addEventListener('click', () => {
-        this.localizarUsuario();
-      });
-    }
-
-  },
-
-  actualizarContador(total) {
-
-    const elemento = document.getElementById('map-business-count');
-
-    if (elemento) {
-      elemento.textContent = `${total} negocios encontrados`;
-    }
-
-  },
 
   // =======================================================
   // ACTUALIZACIÓN EN TIEMPO REAL
