@@ -1,26 +1,25 @@
 /* =====================================================================
    NexoLocal · Integración con Supabase
-   Cargar DESPUÉS de app.js:  <script src="supabase-integration.js"></script>
+   Cargar DESPUÉS de supabase-js (CDN) y de app.js:
+     <script src="supabase-integration.js"></script>
    No reemplaza app.js: sobreescribe DB_HOOKS y unas pocas funciones.
+   Ajustado al diccionario de datos (negocios.nombre_negocio, roles
+   CLIENTE/PROVEEDOR, columnas obligatorias, etc.).
    ===================================================================== */
-
-/*
-const SUPABASE_URL = 'https://sizgktvthrvijrpzqjve.supabase.co/rest/v1/';   // Project Settings > API
-const SUPABASE_ANON_KEY = 'sb_publishable_rA3ZAagAc-IlwoASGxg4Ug_GSEXE7PD';     // la clave "anon public" (NUNCA la service_role)
-const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-*/
 
 const SUPABASE_URL = 'https://sizgktvthrvijrpzqjve.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_rA3ZAagAc-IlwoASGxg4Ug_GSEXE7PD';
 
-const sb = window.supabase.createClient(
-  SUPABASE_URL,
-  SUPABASE_ANON_KEY
-);
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 let datosReales = false;       // true cuando las tiendas vienen de la base de datos
 let canalesRT = [];
 const esDemo = () => !usuarioActual || usuarioActual.id === 'demo-user';
+
+/* ---------- roles: app.js ('comprador' / 'vendedor') <-> BD ('CLIENTE' / 'PROVEEDOR') ---------- */
+const ROLES_PROVEEDOR = ['vendedor', 'proveedor', 'negocio', 'productor'];
+const rolABD = r => (ROLES_PROVEEDOR.includes(String(r || '').toLowerCase()) ? 'PROVEEDOR' : 'CLIENTE');
+const rolDeBD = r => (r === 'PROVEEDOR' ? 'vendedor' : 'comprador');
 
 /* ---------- utilidades ---------- */
 function contactoAEmail(contacto) {
@@ -63,13 +62,15 @@ async function cargarPerfil(uid) {
   const { data: p, error } = await sb.from('perfiles').select('*').eq('id', uid).single();
   if (error || !p) return { error: 'No se encontró tu perfil.' };
   let negocioId = null;
-  if (p.rol === 'vendedor') {
-    const { data: n } = await sb.from('negocios').select('id').eq('dueno_id', uid).maybeSingle();
+  if (p.rol === 'PROVEEDOR') {
+    // negocios tiene user_id y dueno_id: se acepta cualquiera de los dos
+    const { data: n } = await sb.from('negocios').select('id')
+      .or(`dueno_id.eq.${uid},user_id.eq.${uid}`).limit(1).maybeSingle();
     negocioId = n?.id || null;
   }
   return {
     data: {
-      id: p.id, nombre: p.nombre, contacto: p.contacto, rol: p.rol,
+      id: p.id, nombre: p.nombre, contacto: p.contacto, rol: rolDeBD(p.rol),
       giro: p.giro, whatsapp: p.whatsapp, verificado: p.verificado, negocioId
     }
   };
@@ -84,15 +85,17 @@ function productoDBaLocal(p) {
 }
 
 function negocioATienda(n) {
+  const lat = n.lat ?? n.latitud;
+  const lng = n.lng ?? n.longitud;
   return {
     id: n.id,
-    nombre: n.nombre,
+    nombre: n.nombre_negocio,
     categoria: n.categoria || 'Tiendas y Abarrotes',
-    descripcion: n.descripcion || '',
+    descripcion: n.descripcion || n.historia || '',
     offsetLat: 0.002,
     offsetLng: 0.002,
-    sinUbicacion: n.lat == null || n.lng == null,
-    coords: [Number(n.lat ?? 24.0298), Number(n.lng ?? -104.6506)],
+    sinUbicacion: lat == null || lng == null,
+    coords: [Number(lat ?? 24.0298), Number(lng ?? -104.6506)],
     distanciaKm: 0,
     calificacion: Number(n.calificacion_promedio || 0),
     resenasCount: n.resenas_count || 0,
@@ -111,7 +114,7 @@ function pedidoDBaLocal(p) {
     id: p.codigo,                 // la UI muestra y usa el código
     dbId: p.id,
     tiendaId: p.negocio_id,
-    tiendaNombre: p.negocios?.nombre || 'Negocio',
+    tiendaNombre: p.negocios?.nombre_negocio || 'Negocio',
     compradorNombre: p.comprador_nombre || 'Comprador',
     items: (p.pedido_items || []).map(i => ({
       prodKey: i.producto_id, nombre: i.nombre, unidad: i.unidad,
@@ -148,7 +151,7 @@ async function recargarTiendas() {
 
 async function recargarPedidos() {
   if (esDemo()) return;
-  let q = sb.from('pedidos').select('*, negocios(nombre), pedido_items(*)').order('creado_en', { ascending: false });
+  let q = sb.from('pedidos').select('*, negocios(nombre_negocio), pedido_items(*)').order('creado_en', { ascending: false });
   q = (usuarioActual.rol === 'vendedor' && usuarioActual.negocioId)
     ? q.eq('negocio_id', usuarioActual.negocioId)
     : q.eq('comprador_id', usuarioActual.id);
@@ -189,10 +192,13 @@ async function ofrecerUbicacionNegocio() {
   if (!confirm('Tu negocio aún no tiene ubicación en el mapa. ¿Usar tu ubicación actual?')) return;
   navigator.geolocation.getCurrentPosition(
     async pos => {
+      const { latitude, longitude } = pos.coords;
+      // Se guardan ambos pares de columnas (lat/lng y latitud/longitud) para mantenerlas iguales
       const { error } = await sb.from('negocios')
-        .update({ lat: pos.coords.latitude, lng: pos.coords.longitude }).eq('id', mia.id);
+        .update({ lat: latitude, lng: longitude, latitud: latitude, longitud: longitude })
+        .eq('id', mia.id);
       if (error) { alert('No se pudo guardar la ubicación.'); return; }
-      mia.coords = [pos.coords.latitude, pos.coords.longitude];
+      mia.coords = [latitude, longitude];
       mia.sinUbicacion = false;
     },
     () => alert('No se pudo obtener tu ubicación. Activa el permiso del navegador.')
@@ -224,11 +230,16 @@ Object.assign(DB_HOOKS, {
     const { data, error } = await sb.auth.signUp({
       email: contactoAEmail(d.contacto),
       password: d.password,
-      options: { data: { nombre: d.nombre, contacto: d.contacto, rol: d.rol, giro: d.giro, whatsapp: d.whatsapp } }
+      options: {
+        data: {
+          nombre: d.nombre, contacto: d.contacto, rol: rolABD(d.rol),   // CLIENTE o PROVEEDOR
+          giro: d.giro, whatsapp: d.whatsapp
+        }
+      }
     });
     if (error) return { error: traducirErrorAuth(error) };
     if (!data.session) return { error: 'Cuenta creada. Confirma tu correo y luego inicia sesión.' };
-    return cargarPerfil(data.user.id);   // el trigger ya creó perfil (y negocio si es vendedor)
+    return cargarPerfil(data.user.id);   // el trigger ya creó perfil (y negocio si es proveedor)
   },
 
   async autenticarUsuario(contacto, password) {
@@ -245,10 +256,15 @@ Object.assign(DB_HOOKS, {
   },
 
   async crearProducto(p) {
+    const minimo = p.minimo ?? 5;
     const r = await ejecutar('crearProducto', () =>
       sb.from('productos').insert({
         negocio_id: usuarioActual.negocioId, nombre: p.nombre, categoria: p.categoria,
-        subcategoria: p.subcategoria, unidad: p.unidad, precio: p.precio, stock: p.stock, minimo: p.minimo ?? 5
+        subcategoria: p.subcategoria, unidad: p.unidad, precio: p.precio,
+        stock: p.stock, minimo,
+        // columnas antiguas (int4, obligatorias): se mantienen sincronizadas
+        stock_actual: Math.round(Number(p.stock) || 0),
+        stock_minimo: Math.round(Number(minimo) || 0)
       }).select('id').single());
     if (r.error) { alert('No se pudo guardar el artículo: ' + r.error); return r; }
     if (r.data?.id) {          // p es el mismo objeto que está en inventarioLocal
@@ -303,6 +319,7 @@ Object.assign(DB_HOOKS, {
   registrarSolicitudProveedor(ordenes) {
     return ejecutar('solicitud_proveedor', () =>
       sb.from('solicitudes_proveedor').insert(ordenes.map(o => ({
+        user_id: usuarioActual.id,   // columna obligatoria en la tabla
         negocio_id: usuarioActual.negocioId, producto_id: o.productoId,
         nombre: o.nombre, cantidad: o.cantidad, unidad: o.unidad
       }))));
