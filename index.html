@@ -74,7 +74,7 @@
         <div id="campos-extra-vendedor" class="hidden">
           <div class="form-row">
             <div class="input-group">
-              <label for="reg-giro">Giro del negocio</label>
+              <label for="reg-giro">Tipo / Categoría de negocio</label>
               <select id="reg-giro" class="select-field">
                 <option value="Producción Local">Producción Local</option>
                 <option value="Tiendas y Abarrotes">Tiendas y Abarrotes</option>
@@ -89,6 +89,54 @@
               <label for="reg-whatsapp">WhatsApp (10 dígitos)</label>
               <input type="text" id="reg-whatsapp" inputmode="numeric" maxlength="10" oninput="soloNumeros(this)" placeholder="6181234567" />
             </div>
+          </div>
+
+          <div class="input-group">
+            <label for="reg-que-vende">¿Qué productos o servicios vendes?</label>
+            <input type="text" id="reg-que-vende" placeholder="Ej. Abarrotes, lácteos, pan dulce, verdura fresca..." />
+          </div>
+
+          <!-- MINI MANUAL / CHAT ASISTENTE PARA ELEGIR CATEGORIA -->
+          <div class="reg-helper-box">
+            <div class="reg-helper-header">
+              <span><i data-lucide="sparkles" class="icon-sm"></i> <strong>Asistente</strong> — ¿No sabes en qué categoría entras?</span>
+              <button type="button" class="btn-link-mini" onclick="toggleAsistenteRegistro()">Abrir asistente</button>
+            </div>
+            <div id="reg-asistente-panel" class="reg-asistente-panel hidden">
+              <p class="hint" style="margin-bottom:0.45rem;">
+                <strong>Guía rápida:</strong> <em>Producción Local</em> (cosecha, miel, granos propios) · <em>Tiendas y Abarrotes</em> (despensa, bebidas, cremería) · <em>Alimentos Preparados</em> (comida, panadería, jugos).
+              </p>
+              <div id="reg-asistente-chat-log" class="reg-asistente-log">
+                <div class="msg msg-bot" style="padding:0.45rem 0.65rem; font-size:0.78rem;">
+                  Dime qué vendes (ej. "vendo quesos y refrescos" o "tengo cosecha de tomate") y te indico tu categoría exacta.
+                </div>
+              </div>
+              <div class="reg-asistente-input-row">
+                <input type="text" id="reg-asistente-input" placeholder="Escribe qué vendes..." onkeydown="if(event.key==='Enter'){event.preventDefault();consultarCategoriaRegistro();}" />
+                <button type="button" class="btn-card-mini primary" onclick="consultarCategoriaRegistro()">Consultar</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- UBICACION EXACTA DEL NEGOCIO CON VALIDACION DE RADIO DE 500M -->
+          <div class="reg-geo-box">
+            <div class="reg-geo-header">
+              <div>
+                <strong><i data-lucide="map-pin" class="icon-sm"></i> Ubicación exacta de tu tienda</strong>
+                <small id="reg-ubicacion-status" class="hint" style="display:block;">Activa tu ubicación para fijar el punto de tu negocio (máx. 500 m alrededor).</small>
+              </div>
+              <button type="button" class="btn-card-mini primary" id="btn-reg-activar-ubicacion" onclick="activarUbicacionRegistroVendedor()">
+                <i data-lucide="navigation"></i> Activar ubicación
+              </button>
+            </div>
+            <div id="reg-seller-map-wrap" class="reg-seller-map-wrap hidden">
+              <div id="reg-seller-map" class="reg-seller-map"></div>
+              <small id="reg-geo-radius-msg" class="hint" style="display:block; margin-top:0.35rem;">
+                Haz clic dentro del círculo verde (500 m) para ajustar el punto exacto de tu local.
+              </small>
+            </div>
+            <input type="hidden" id="reg-lat" />
+            <input type="hidden" id="reg-lng" />
           </div>
         </div>
 
@@ -227,19 +275,17 @@
   <!-- VISTA COMPRADOR -->
   <main id="vista-comprador" class="main-container">
     <section class="filters-bar">
-      <div class="filter-chips" id="category-filters">
-        <button class="chip active" data-cat="todos"><i data-lucide="layout-grid"></i> Todos</button>
-        <button class="chip" data-cat="Producción Local"><i data-lucide="sprout"></i> Producción Local</button>
-        <button class="chip" data-cat="Tiendas y Abarrotes"><i data-lucide="store"></i> Tiendas y Abarrotes</button>
-        <button class="chip" data-cat="Alimentos Preparados"><i data-lucide="utensils"></i> Alimentos Preparados</button>
-        <button class="chip" data-cat="Insumos y Papelería"><i data-lucide="package"></i> Insumos y Papelería</button>
-        <button class="chip" data-cat="Ferretería y Construcción"><i data-lucide="wrench"></i> Ferretería</button>
-        <button class="chip" data-cat="Talleres y Oficios"><i data-lucide="hammer"></i> Talleres y Oficios</button>
-        <button class="chip" data-cat="Vivero y Jardinería"><i data-lucide="flower-2"></i> Vivero</button>
-      </div>
-      <div class="live-indicator">
-        <span class="pulse-dot"></span>
-        <span>Existencias en tiempo real</span>
+      <div class="filter-chips collapsed" id="category-filters">
+        <button type="button" class="chip active" id="btn-toggle-categorias" data-cat="todos" onclick="toggleDesplegarCategorias(this)">
+          <i data-lucide="layout-grid"></i> <span>Todos</span> <i data-lucide="chevron-down" id="icon-toggle-categorias" class="icon-sm"></i>
+        </button>
+        <button type="button" class="chip cat-extra hidden" data-cat="Producción Local"><i data-lucide="sprout"></i> Producción Local</button>
+        <button type="button" class="chip cat-extra hidden" data-cat="Tiendas y Abarrotes"><i data-lucide="store"></i> Tiendas y Abarrotes</button>
+        <button type="button" class="chip cat-extra hidden" data-cat="Alimentos Preparados"><i data-lucide="utensils"></i> Alimentos Preparados</button>
+        <button type="button" class="chip cat-extra hidden" data-cat="Insumos y Papelería"><i data-lucide="package"></i> Insumos y Papelería</button>
+        <button type="button" class="chip cat-extra hidden" data-cat="Ferretería y Construcción"><i data-lucide="wrench"></i> Ferretería</button>
+        <button type="button" class="chip cat-extra hidden" data-cat="Talleres y Oficios"><i data-lucide="hammer"></i> Talleres y Oficios</button>
+        <button type="button" class="chip cat-extra hidden" data-cat="Vivero y Jardinería"><i data-lucide="flower-2"></i> Vivero</button>
       </div>
     </section>
 
@@ -466,7 +512,7 @@
               <th>Categoría y Subcategoría</th>
               <th>Precio por Unidad</th>
               <th>Stock Actual / Meta</th>
-              <th>Estado</th>
+              <th class="col-estado">Estado</th>
               <th>Registrar Salida / Entrada</th>
             </tr>
           </thead>
@@ -530,7 +576,7 @@
       </div>
     </section>
 
-    <!-- PEDIDOS -->
+    <!-- PEDIDOS Y PROVEEDORES -->
     <section id="tab-pedidos" class="seller-tab-content hidden">
       <div class="orders-split">
         <div class="card-surface panel-box">
@@ -548,10 +594,19 @@
         <div class="card-surface panel-box">
           <div class="panel-box-header">
             <h3><i data-lucide="truck"></i> Reabastecimiento a Proveedores</h3>
-            <button type="button" id="btn-solicitar-todo" class="btn-primary btn-sm hidden" onclick="solicitarTodoProveedores()">
-              <i data-lucide="send"></i> Solicitar todo
-            </button>
+            <div style="display:flex; gap:0.45rem; flex-wrap:wrap;">
+              <button type="button" class="btn-ghost btn-sm" onclick="abrirModalNuevoProveedor()">
+                <i data-lucide="user-plus"></i> Agregar proveedor
+              </button>
+              <button type="button" id="btn-solicitar-todo" class="btn-primary btn-sm hidden" onclick="solicitarTodoProveedores()">
+                <i data-lucide="send"></i> Solicitar todo
+              </button>
+            </div>
           </div>
+
+          <!-- DIRECTORIO DE PROVEEDORES REGISTRADOS DEL NEGOCIO -->
+          <div id="proveedores-registrados-wrap" class="providers-strip"></div>
+
           <div id="reabastecimiento-feedback" class="verify-feedback ok hidden" style="margin-bottom: 0.75rem;"></div>
           <div id="lista-pedidos-proveedores" class="orders-list">
             <div class="empty-box">
@@ -598,6 +653,43 @@
       </div>
     </section>
   </main>
+
+  <!-- MODAL AGREGAR NUEVO PROVEEDOR -->
+  <div id="modal-nuevo-proveedor" class="modal-backdrop hidden" onclick="cerrarModal('modal-nuevo-proveedor')">
+    <div class="modal-card animate-pop" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <div>
+          <h2>Agregar Proveedor</h2>
+          <p>Registra de dónde proviene tu mercancía para asignarle órdenes de reabastecimiento.</p>
+        </div>
+        <button class="btn-close" onclick="cerrarModal('modal-nuevo-proveedor')"><i data-lucide="x"></i></button>
+      </div>
+      <form onsubmit="guardarNuevoProveedor(event)">
+        <div class="input-group">
+          <label for="prov-nombre">Nombre del proveedor o distribuidora</label>
+          <input type="text" id="prov-nombre" placeholder="Ej. Distribuidora Agrícola del Valle" required />
+        </div>
+        <div class="form-row">
+          <div class="input-group">
+            <label for="prov-categoria">Categoría que surte</label>
+            <select id="prov-categoria" class="select-field"></select>
+          </div>
+          <div class="input-group">
+            <label for="prov-telefono">Teléfono / WhatsApp (10 dígitos)</label>
+            <input type="text" id="prov-telefono" inputmode="numeric" maxlength="10" oninput="soloNumeros(this)" placeholder="6181234567" required />
+          </div>
+        </div>
+        <div class="input-group">
+          <label for="prov-productos">Artículos que abastece o notas de entrega</label>
+          <input type="text" id="prov-productos" placeholder="Ej. Tomate, maíz criollo, entregas martes y viernes" required />
+        </div>
+        <button type="submit" class="btn-primary btn-full">
+          <i data-lucide="check"></i>
+          <span>Guardar proveedor</span>
+        </button>
+      </form>
+    </div>
+  </div>
 
   <!-- MODAL MODIFICAR PRODUCTOS DE TEMPORADA ALTA -->
   <div id="modal-modificar-temporada" class="modal-backdrop hidden" onclick="cerrarModal('modal-modificar-temporada')">
