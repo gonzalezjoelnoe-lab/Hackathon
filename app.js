@@ -89,112 +89,167 @@ const DB_HOOKS = {
    APARTADO DE CONEXION AL MAPA (LEAFLET)
    ========================================================= */
 const MAP_HOOKS = {
- // 2. Inicializar mapa centrado en Durango
-const map = L.map('map').setView([24.0298, -104.6506], 15);
 
-// Quita el cuadro "Contenedor de Mapa Listo" y recalcula el tamaño del mapa
-document.getElementById('map-empty-state')?.remove();
-setTimeout(() => map.invalidateSize(), 300);
+  map: null,
+  capaMarcadores: null,
+  productoresCache: [],
 
-// 3. Mapa base: solo calles, sin negocios
-L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
-  attribution: 'Tiles &copy; Esri',
-  maxNativeZoom: 16,
-  maxZoom: 19
-}).addTo(map);
+  esc(texto) {
+    return String(texto ?? '').replace(/[&<>"']/g, c => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[c]));
+  },
 
-// Nombres de calles y colonias (borra este bloque si no los quieres)
-L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Reference/MapServer/tile/{z}/{y}/{x}', {
-  maxNativeZoom: 16,
-  maxZoom: 19
-}).addTo(map);
+  inicializar() {
+    // 1. Si el mapa ya existe, solo recalcular su tamaño al volver a la vista
+    if (this.map) {
+      setTimeout(() => this.map.invalidateSize(), 200);
+      return;
+    }
 
-// 4. Ícono personalizado del productor
-const iconoProductor = L.divIcon({
-  className: 'pin-custom',
-  html: '<div class="pin"><span>🌿</span></div>',
-  iconSize: [40, 48],
-  iconAnchor: [20, 48],
-  popupAnchor: [0, -44]
-});
+    const contenedor = document.getElementById('map');
+    if (!contenedor) return;
 
-// 5. Evita que texto de la base de datos rompa el HTML del popup
-function esc(texto) {
-  return String(texto ?? '').replace(/[&<>"']/g, c => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-  }[c]));
-}
+    // 2. Inicializar mapa centrado en Durango
+    this.map = L.map('map').setView([24.0298, -104.6506], 15);
+    this.capaMarcadores = L.layerGroup().addTo(this.map);
 
-// 6. Consultar productores y sus productos
-async function cargarMapa() {
-  const { data: productores, error } = await supabaseClient
-    .from('productores')
-    .select(`
-      id,
-      nombre_negocio,
-      whatsapp,
-      historia,
-      latitud,
-      longitud,
-      productos (
+    document.getElementById('map-empty-state')?.remove();
+    setTimeout(() => this.map.invalidateSize(), 300);
+
+    // 3. Capas base de Esri
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
+      attribution: 'Tiles &copy; Esri',
+      maxNativeZoom: 16,
+      maxZoom: 19
+    }).addTo(this.map);
+
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Reference/MapServer/tile/{z}/{y}/{x}', {
+      maxNativeZoom: 16,
+      maxZoom: 19
+    }).addTo(this.map);
+
+    // 4. Cargar datos
+    this.cargarMapa();
+  },
+
+  async cargarMapa() {
+    // Validación de seguridad por si supabaseClient aún no se inicializa en el HTML
+    if (typeof supabaseClient === 'undefined') {
+      console.warn('supabaseClient no está definido. Usando datos locales de demostración.');
+      this.productoresCache = [
+        {
+          id: 'demo-prod-1',
+          nombre_negocio: 'Productor Local Durango',
+          whatsapp: '6180000000',
+          historia: 'Producción artesanal local.',
+          latitud: 24.0298,
+          longitud: -104.6506,
+          productos: inventarioLocal
+        }
+      ];
+      this.pintarMarcadores(this.productoresCache);
+      return;
+    }
+
+    const { data: productores, error } = await supabaseClient
+      .from('productores')
+      .select(`
         id,
-        nombre,
-        categoria,
-        descripcion,
-        precio,
-        imagen_url
-      )
-    `);
+        nombre_negocio,
+        whatsapp,
+        historia,
+        latitud,
+        longitud,
+        productos (
+          id,
+          nombre,
+          categoria,
+          descripcion,
+          precio,
+          imagen_url
+        )
+      `);
 
-  if (error) {
-    console.error('Error al consultar Supabase:', error.message);
-    return;
+    if (error) {
+      console.error('Error al consultar Supabase:', error.message);
+      return;
+    }
+
+    this.productoresCache = productores || [];
+    this.pintarMarcadores(this.productoresCache);
+  },
+
+  pintarMarcadores(listaProductores) {
+    if (!this.map || !this.capaMarcadores) return;
+    this.capaMarcadores.clearLayers();
+
+    const iconoProductor = L.divIcon({
+      className: 'pin-custom',
+      html: '<div class="pin"><span>🌿</span></div>',
+      iconSize: [40, 48],
+      iconAnchor: [20, 48],
+      popupAnchor: [0, -44]
+    });
+
+    const marcadores = [];
+
+    listaProductores.forEach(prod => {
+      if (prod.latitud == null || prod.longitud == null) return;
+
+      const listaProductosHTML = (prod.productos && prod.productos.length > 0)
+        ? prod.productos.map(item => `
+            <div class="producto-item">
+              ${item.imagen_url ? `<img src="${this.esc(item.imagen_url)}" alt="${this.esc(item.nombre)}" class="producto-img">` : ''}
+              ${item.categoria ? `<span class="badge-cat">${this.esc(item.categoria)}</span><br>` : ''}
+              <div class="producto-titulo">${this.esc(item.nombre)} — <span class="producto-precio">$${this.esc(item.precio)}</span></div>
+              ${item.descripcion ? `<p class="producto-desc">${this.esc(item.descripcion)}</p>` : ''}
+            </div>
+          `).join('')
+        : '<p class="producto-desc"><em>Este productor aún no tiene productos cargados.</em></p>';
+
+      const mensajeWA = encodeURIComponent(`Hola ${prod.nombre_negocio}, vi sus productos en el mapa y me gustaría hacer un pedido.`);
+      const telefono = String(prod.whatsapp ?? '').replace(/\D/g, '');
+
+      const popupHTML = `
+        <div class="popup-card">
+          <h3>${this.esc(prod.nombre_negocio)}</h3>
+          ${prod.historia ? `<p class="popup-historia">${this.esc(prod.historia)}</p>` : ''}
+          ${listaProductosHTML}
+          <a href="https://wa.me/${telefono}?text=${mensajeWA}" target="_blank" rel="noopener" class="btn-wa">
+            Pedir por WhatsApp
+          </a>
+        </div>
+      `;
+
+      const marker = L.marker([prod.latitud, prod.longitud], { icon: iconoProductor })
+        .addTo(this.capaMarcadores)
+        .bindPopup(popupHTML, { maxWidth: 280 });
+
+      marcadores.push(marker);
+    });
+
+    if (marcadores.length > 0) {
+      this.map.fitBounds(L.featureGroup(marcadores).getBounds().pad(0.2), { maxZoom: 16 });
+    }
+  },
+
+  filtrarPorCategoria(categoria, subcategoria = 'todas') {
+    if (categoria === 'todos') {
+      this.pintarMarcadores(this.productoresCache);
+      return;
+    }
+
+    const filtrados = this.productoresCache.filter(prod =>
+      (prod.productos || []).some(p => {
+        const coincideCat = p.categoria === categoria;
+        const coincideSub = subcategoria === 'todas' || p.subcategoria === subcategoria;
+        return coincideCat && coincideSub;
+      })
+    );
+
+    this.pintarMarcadores(filtrados);
   }
-
-  const marcadores = [];
-
-  // 7. Pintar cada productor en el mapa
-  productores.forEach(prod => {
-    if (prod.latitud == null || prod.longitud == null) return;
-
-    const listaProductosHTML = (prod.productos && prod.productos.length > 0)
-      ? prod.productos.map(item => `
-          <div class="producto-item">
-            ${item.imagen_url ? `<img src="${esc(item.imagen_url)}" alt="${esc(item.nombre)}" class="producto-img">` : ''}
-            ${item.categoria ? `<span class="badge-cat">${esc(item.categoria)}</span><br>` : ''}
-            <div class="producto-titulo">${esc(item.nombre)} — <span class="producto-precio">$${esc(item.precio)}</span></div>
-            ${item.descripcion ? `<p class="producto-desc">${esc(item.descripcion)}</p>` : ''}
-          </div>
-        `).join('')
-      : '<p class="producto-desc"><em>Este productor aún no tiene productos cargados.</em></p>';
-
-    const mensajeWA = encodeURIComponent(`Hola ${prod.nombre_negocio}, vi sus productos en el mapa y me gustaría hacer un pedido.`);
-    const telefono = String(prod.whatsapp ?? '').replace(/\D/g, '');
-
-    const popupHTML = `
-      <div class="popup-card">
-        <h3>${esc(prod.nombre_negocio)}</h3>
-        ${prod.historia ? `<p class="popup-historia">${esc(prod.historia)}</p>` : ''}
-        ${listaProductosHTML}
-        <a href="https://wa.me/${telefono}?text=${mensajeWA}" target="_blank" rel="noopener" class="btn-wa">
-          Pedir por WhatsApp
-        </a>
-      </div>
-    `;
-
-    const marker = L.marker([prod.latitud, prod.longitud], { icon: iconoProductor })
-      .addTo(map)
-      .bindPopup(popupHTML, { maxWidth: 280 });
-    marcadores.push(marker);
-  });
-
-  // 8. Ajustar el mapa para que se vean todos los pines
-  if (marcadores.length > 0) {
-    map.fitBounds(L.featureGroup(marcadores).getBounds().pad(0.2), { maxZoom: 16 });
-  }
-}
-
-cargarMapa();
 };
 
 /* =========================================================
