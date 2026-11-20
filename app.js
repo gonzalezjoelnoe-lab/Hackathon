@@ -2,20 +2,55 @@ lucide.createIcons();
 
 let rolRegistro = 'comprador';
 let usuarioActual = null;
-let totalMovimientosTurno = 0;
+let entradasTurno = 0;
+let salidasTurno = 0;
+
+const CATEGORIAS_CATALOGO = {
+  'Producción Local': [
+    'Miel y Derivados',
+    'Lácteos y Quesos',
+    'Frutas y Hortalizas',
+    'Panadería Artesanal',
+    'Conservas y Salsas'
+  ],
+  'Tiendas y Abarrotes': [
+    'Despensa Básica',
+    'Bebidas',
+    'Lácteos y Embutidos',
+    'Limpieza del Hogar',
+    'Botanas y Dulcería'
+  ],
+  'Insumos y Papelería': [
+    'Papelería Escolar',
+    'Mercería y Costura',
+    'Empaques y Desechables',
+    'Material de Oficina'
+  ],
+  'Talleres y Oficios': [
+    'Artesanías',
+    'Carpintería y Madera',
+    'Textiles y Bordado',
+    'Herrería y Reparaciones'
+  ]
+};
 
 let inventarioLocal = [
-  { id: 'demo-1', nombre: 'Artículo de Muestra', categoria: 'General', precio: 120.00, stock: 10, minimo: 5 }
+  {
+    id: 'demo-1',
+    nombre: 'Artículo de Muestra',
+    categoria: 'Producción Local',
+    subcategoria: 'Miel y Derivados',
+    precio: 120.00,
+    stock: 10,
+    minimo: 5
+  }
 ];
 
 /* =========================================================
    APARTADO DE CONEXION A BASE DE DATOS (SUPABASE)
-   Integrante de BD: pega aquí tu cliente Supabase y conecta
-   las consultas dentro de DB_HOOKS.
    ========================================================= */
 const DB_HOOKS = {
   async registrarUsuario(datosUsuario) {
-    // Conectar: const { data, error } = await supabase.from('usuarios').insert(datosUsuario).select().single();
     const usuariosGuardados = JSON.parse(localStorage.getItem('nexolocal_usuarios') || '[]');
     if (usuariosGuardados.some(u => u.contacto.toLowerCase() === datosUsuario.contacto.toLowerCase())) {
       return { error: 'Este correo o teléfono ya está registrado.' };
@@ -27,7 +62,6 @@ const DB_HOOKS = {
   },
 
   async autenticarUsuario(contacto, password) {
-    // Conectar: const { data, error } = await supabase.from('usuarios').select('*').eq('contacto', contacto).eq('password', password).single();
     const usuariosGuardados = JSON.parse(localStorage.getItem('nexolocal_usuarios') || '[]');
     const encontrado = usuariosGuardados.find(
       u => u.contacto.toLowerCase() === contacto.toLowerCase() && u.password === password
@@ -39,17 +73,14 @@ const DB_HOOKS = {
   },
 
   async registrarMovimientoInventario(productoId, tipo, cantidad) {
-    // Conectar: actualizar stock_actual en 'productos' e insertar en 'movimientos_inventario'
     console.log('Sincronizar en Supabase:', { productoId, tipo, cantidad });
   },
 
   async crearProducto(datosProducto) {
-    // Conectar: supabase.from('productos').insert(datosProducto)
     console.log('Insertar producto en Supabase:', datosProducto);
   },
 
   async guardarVerificacionHumana(usuarioId, coordenadas) {
-    // Conectar: supabase.from('usuarios').update({ verificado: true }).eq('id', usuarioId)
     console.log('Guardar verificación en Supabase:', { usuarioId, coordenadas });
   }
 };
@@ -57,23 +88,22 @@ const DB_HOOKS = {
 /* =========================================================
    APARTADO DE CONEXION AL MAPA (LEAFLET)
    ========================================================= */
-const MAP_HOOKS =  {
+const MAP_HOOKS = {
   mapInstance: null,
   inicializar() {
-    // Integrante de Mapa: inicializar L.map('map') aquí
-    const map = L.map('map').setView([24.0298, -104.6506], 15);
-
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-  attribution: '&copy; OpenStreetMap contributors'
-}).addTo(map);
+    if (this.mapInstance) return;
+    this.mapInstance = L.map('map').setView([24.0298, -104.6506], 15);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(this.mapInstance);
   },
-  filtrarPorCategoria(categoria) {
-    console.log('Filtrar marcadores por:', categoria);
+  filtrarPorCategoria(categoria, subcategoria = 'todas') {
+    console.log('Filtrar marcadores por:', { categoria, subcategoria });
   }
 };
 
 /* =========================================================
-   VALIDACION ESTRICTA DE NUMEROS
+   VALIDACION ESTRICTA DE NUMEROS Y CONTRASENAS
    ========================================================= */
 function soloNumeros(input) {
   input.value = input.value.replace(/[^0-9]/g, '');
@@ -87,6 +117,36 @@ function normalizarCantidadInput(input) {
   const limpio = input.value.replace(/[^0-9]/g, '');
   const numero = parseInt(limpio, 10);
   input.value = (!numero || numero <= 0) ? '1' : String(numero);
+}
+
+function verificarReglasPassword(pass) {
+  const longitudValida = pass.length >= 8 && pass.length <= 10 && !/\s/.test(pass);
+  const tieneNumero = /[0-9]/.test(pass);
+  const tieneEspecial = /[^A-Za-z0-9áéíóúÁÉÍÓÚñÑüÜ\s]/.test(pass);
+  return {
+    longitudValida,
+    tieneNumero,
+    tieneEspecial,
+    esValida: longitudValida && tieneNumero && tieneEspecial
+  };
+}
+
+function validarPasswordEnVivo(valor) {
+  const estado = verificarReglasPassword(valor);
+  actualizarEstadoRegla('rule-len', estado.longitudValida);
+  actualizarEstadoRegla('rule-num', estado.tieneNumero);
+  actualizarEstadoRegla('rule-sym', estado.tieneEspecial);
+  lucide.createIcons();
+}
+
+function actualizarEstadoRegla(id, cumple) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.classList.toggle('valid', cumple);
+  const icono = el.querySelector('svg, i');
+  if (icono) {
+    icono.setAttribute('data-lucide', cumple ? 'check-circle-2' : 'circle');
+  }
 }
 
 /* =========================================================
@@ -122,10 +182,19 @@ async function procesarRegistro(event) {
   const errorBox = document.getElementById('reg-error-msg');
   errorBox.classList.add('hidden');
 
+  const password = document.getElementById('reg-password').value;
+  const checkPass = verificarReglasPassword(password);
+
+  if (!checkPass.esValida) {
+    errorBox.textContent = 'La contraseña debe tener entre 8 y 10 caracteres (sin espacios), incluir al menos un número y un carácter especial.';
+    errorBox.classList.remove('hidden');
+    return;
+  }
+
   const datos = {
     nombre: document.getElementById('reg-nombre').value.trim(),
     contacto: document.getElementById('reg-contacto').value.trim(),
-    password: document.getElementById('reg-password').value,
+    password,
     rol: rolRegistro,
     giro: rolRegistro === 'vendedor' ? document.getElementById('reg-giro').value : null,
     whatsapp: rolRegistro === 'vendedor' ? document.getElementById('reg-whatsapp').value.trim() : null
@@ -214,8 +283,43 @@ function cerrarSesion() {
 }
 
 /* =========================================================
-   INVENTARIO CON ENTRADAS Y SALIDAS POR CANTIDAD EXACTA
+   CATEGORIAS, SUBCATEGORIAS E INVENTARIO
    ========================================================= */
+function actualizarSubcategoriasModal(categoriaSeleccionada) {
+  const selectSub = document.getElementById('prod-subcategoria');
+  if (!selectSub) return;
+  const opciones = CATEGORIAS_CATALOGO[categoriaSeleccionada] || ['General'];
+  selectSub.innerHTML = opciones
+    .map(sub => `<option value="${sub}">${sub}</option>`)
+    .join('');
+}
+
+function renderizarSubcategoriasComprador(categoria) {
+  const bar = document.getElementById('subcategory-bar');
+  const contenedor = document.getElementById('subcategory-filters');
+  if (!bar || !contenedor) return;
+
+  if (categoria === 'todos' || !CATEGORIAS_CATALOGO[categoria]) {
+    bar.classList.add('hidden');
+    contenedor.innerHTML = '';
+    return;
+  }
+
+  const subs = CATEGORIAS_CATALOGO[categoria];
+  contenedor.innerHTML = `<button class="subchip active" data-sub="todas">Todas</button>` +
+    subs.map(s => `<button class="subchip" data-sub="${s}">${s}</button>`).join('');
+
+  contenedor.querySelectorAll('.subchip').forEach(btn => {
+    btn.addEventListener('click', () => {
+      contenedor.querySelectorAll('.subchip').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      MAP_HOOKS.filtrarPorCategoria(categoria, btn.dataset.sub);
+    });
+  });
+
+  bar.classList.remove('hidden');
+}
+
 function renderizarInventario() {
   const tbody = document.getElementById('tabla-inventario-body');
   tbody.innerHTML = '';
@@ -229,7 +333,12 @@ function renderizarInventario() {
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td><strong>${item.nombre}</strong></td>
-      <td>${item.categoria}</td>
+      <td>
+        <div class="cat-cell">
+          <span class="cat-main">${item.categoria}</span>
+          <span class="subcat-tag">${item.subcategoria || 'General'}</span>
+        </div>
+      </td>
       <td>$${Number(item.precio).toFixed(2)}</td>
       <td><strong id="stock-${item.id}">${item.stock}</strong> uds</td>
       <td>
@@ -263,7 +372,8 @@ function renderizarInventario() {
 
   document.getElementById('kpi-total-productos').textContent = inventarioLocal.length;
   document.getElementById('kpi-stock-bajo').textContent = criticos;
-  document.getElementById('kpi-movimientos').textContent = `${totalMovimientosTurno} uds movidas`;
+  document.getElementById('kpi-entradas').textContent = `${entradasTurno} uds`;
+  document.getElementById('kpi-salidas').textContent = `${salidasTurno} uds`;
   lucide.createIcons();
 }
 
@@ -277,11 +387,13 @@ function aplicarMovimientoStock(productoId, tipo) {
 
   if (tipo === 'ENTRADA') {
     producto.stock += cantidad;
+    entradasTurno += cantidad;
   } else {
+    const descontado = Math.min(producto.stock, cantidad);
     producto.stock = Math.max(0, producto.stock - cantidad);
+    salidasTurno += descontado;
   }
 
-  totalMovimientosTurno += cantidad;
   renderizarInventario();
   DB_HOOKS.registrarMovimientoInventario(productoId, tipo, cantidad);
 }
@@ -290,6 +402,7 @@ function guardarProductoManual(event) {
   event.preventDefault();
   const nombre = document.getElementById('prod-nombre').value.trim();
   const categoria = document.getElementById('prod-categoria').value;
+  const subcategoria = document.getElementById('prod-subcategoria').value;
   const precio = parseFloat(document.getElementById('prod-precio').value) || 0;
   const stock = parseInt(document.getElementById('prod-stock').value, 10) || 0;
 
@@ -297,6 +410,7 @@ function guardarProductoManual(event) {
     id: `prod-${Date.now()}`,
     nombre,
     categoria,
+    subcategoria,
     precio,
     stock,
     minimo: 5
@@ -307,6 +421,7 @@ function guardarProductoManual(event) {
   DB_HOOKS.crearProducto(nuevo);
   cerrarModal('modal-nuevo-producto');
   event.target.reset();
+  actualizarSubcategoriasModal(document.getElementById('prod-categoria').value);
 }
 
 /* =========================================================
@@ -432,7 +547,7 @@ function actualizarBadgeVerificacion(verificado) {
 }
 
 /* =========================================================
-   ASISTENTE CONVERSACIONAL (ANALISIS DE CATALOGO Y OPERACION)
+   ASISTENTE CONVERSACIONAL
    ========================================================= */
 function usarPromptRapido(texto) {
   document.getElementById('input-chat-comprador').value = texto;
@@ -508,10 +623,13 @@ async function enviarMensajeVendedor(e) {
     const resIA = await resp.json();
 
     if (resIA.accion === 'PUBLICAR' && resIA.datos) {
+      const cat = resIA.datos.categoria || 'Producción Local';
+      const subs = CATEGORIAS_CATALOGO[cat] || ['General'];
       const nuevo = {
         id: `prod-${Date.now()}`,
         nombre: resIA.datos.nombre || 'Artículo Nuevo',
-        categoria: resIA.datos.categoria || 'Producción Local',
+        categoria: cat,
+        subcategoria: resIA.datos.subcategoria || subs[0],
         precio: Number(resIA.datos.precio) || 0,
         stock: parseInt(resIA.datos.cantidad, 10) || 1,
         minimo: 5
@@ -527,10 +645,12 @@ async function enviarMensajeVendedor(e) {
         const cant = parseInt(resIA.datos.cantidad, 10) || 1;
         if (resIA.datos.tipo_movimiento === 'ENTRADA') {
           target.stock += cant;
+          entradasTurno += cant;
         } else {
+          const descontado = Math.min(target.stock, cant);
           target.stock = Math.max(0, target.stock - cant);
+          salidasTurno += descontado;
         }
-        totalMovimientosTurno += cant;
         renderizarInventario();
         DB_HOOKS.registrarMovimientoInventario(target.id, resIA.datos.tipo_movimiento, cant);
       }
@@ -558,7 +678,9 @@ document.querySelectorAll('#category-filters .chip').forEach(chip => {
   chip.addEventListener('click', () => {
     document.querySelectorAll('#category-filters .chip').forEach(c => c.classList.remove('active'));
     chip.classList.add('active');
-    MAP_HOOKS.filtrarPorCategoria(chip.dataset.cat);
+    const cat = chip.dataset.cat;
+    renderizarSubcategoriasComprador(cat);
+    MAP_HOOKS.filtrarPorCategoria(cat, 'todas');
   });
 });
 
@@ -577,6 +699,7 @@ function abrirDetalleTienda(datosNegocio) {
 }
 
 function abrirModalNuevoProducto() {
+  actualizarSubcategoriasModal(document.getElementById('prod-categoria').value);
   document.getElementById('modal-nuevo-producto').classList.remove('hidden');
 }
 
@@ -584,7 +707,9 @@ function cerrarModal(id) {
   document.getElementById(id).classList.add('hidden');
 }
 
-// Restaurar sesión si ya había iniciado
+// Inicializar subcategorías del modal por defecto y restaurar sesión
+actualizarSubcategoriasModal('Producción Local');
+
 const sesionGuardada = localStorage.getItem('nexolocal_sesion');
 if (sesionGuardada) {
   usuarioActual = JSON.parse(sesionGuardada);
