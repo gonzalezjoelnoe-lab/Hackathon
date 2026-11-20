@@ -1021,6 +1021,8 @@ function obtenerProductosTienda(tienda) {
 /* =========================================================
    APARTADO DE CONEXION A BASE DE DATOS (SUPABASE)
    ========================================================= */
+
+
 const DB_HOOKS = {
   async registrarUsuario(datosUsuario) {
     const usuariosGuardados = JSON.parse(localStorage.getItem('nexolocal_usuarios') || '[]');
@@ -1102,8 +1104,15 @@ const MAP_HOOKS = {
   inicializar() {
     if (this.mapInstance) return;
     this.mapInstance = L.map('map').setView([ubicacionUsuario.lat, ubicacionUsuario.lng], 15);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; OpenStreetMap contributors'
+    L.tileLayer(
+      'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',
+      {
+        attribution: 'Tiles © Esri',
+        maxZoom: 19,
+        maxNativeZoom: 19,
+        keepBuffer: 4,
+        updateWhenZooming: false
+      }
     }).addTo(this.mapInstance);
 
     this.mapInstance.on('click', e => {
