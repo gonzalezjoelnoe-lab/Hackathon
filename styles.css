@@ -79,6 +79,8 @@ svg { width: 18px; height: 18px; stroke-width: 2.1; flex-shrink: 0; }
   border-radius: var(--radius-lg);
   border: 1px solid var(--border-color);
   box-shadow: var(--shadow-md);
+  max-height: 94vh;
+  overflow-y: auto;
 }
 
 .auth-brand {
@@ -292,6 +294,7 @@ svg { width: 18px; height: 18px; stroke-width: 2.1; flex-shrink: 0; }
   transition: var(--transition);
 }
 .btn-ghost:hover { background: var(--primary); color: var(--c-blanco); }
+.btn-ghost.btn-sm { padding: 0.42rem 0.78rem; font-size: 0.8rem; }
 
 .btn-promote {
   background: var(--c-maiz);
@@ -628,7 +631,7 @@ svg { width: 18px; height: 18px; stroke-width: 2.1; flex-shrink: 0; }
   background: var(--bg-surface);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
-  overflow-x: auto;
+  flex-wrap: wrap;
 }
 
 .subfilter-label {
@@ -638,7 +641,7 @@ svg { width: 18px; height: 18px; stroke-width: 2.1; flex-shrink: 0; }
   white-space: nowrap;
 }
 
-.filter-chips { display: flex; gap: 0.5rem; overflow-x: auto; padding-bottom: 0.15rem; }
+.filter-chips { display: flex; gap: 0.5rem; flex-wrap: wrap; overflow-x: visible; padding-bottom: 0.15rem; }
 .chip {
   background: var(--bg-surface);
   color: var(--text-main);
@@ -1380,9 +1383,14 @@ svg { width: 18px; height: 18px; stroke-width: 2.1; flex-shrink: 0; }
 .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem; }
 .hint { font-size: 0.82rem; color: var(--text-muted); }
 
-.inventory-table { width: 100%; border-collapse: collapse; min-width: 780px; }
+.inventory-table { width: 100%; border-collapse: collapse; min-width: 820px; }
 .inventory-table th, .inventory-table td { padding: 0.85rem; text-align: left; border-bottom: 1px solid var(--border-color); font-size: 0.9rem; }
 .inventory-table th { color: var(--primary-dark); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.03em; }
+.inventory-table th.col-estado,
+.inventory-table td:nth-child(5) {
+  min-width: 135px;
+  white-space: nowrap;
+}
 
 .cat-cell { display: flex; flex-direction: column; gap: 0.2rem; }
 .cat-main { font-weight: 700; font-size: 0.84rem; color: var(--primary-dark); }
@@ -1409,9 +1417,33 @@ svg { width: 18px; height: 18px; stroke-width: 2.1; flex-shrink: 0; }
   margin-left: 0.25rem;
 }
 
-.badge-ok { background: var(--bg-tint); color: var(--primary-dark); padding: 0.25rem 0.65rem; border-radius: 99px; font-size: 0.78rem; font-weight: 700; display: inline-flex; align-items: center; gap: 0.28rem; }
+.badge-ok {
+  background: var(--bg-tint);
+  color: var(--primary-dark);
+  padding: 0.26rem 0.7rem;
+  border-radius: 99px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+  white-space: nowrap;
+}
 .badge-ok svg { width: 14px; height: 14px; }
-.badge-danger { background: var(--c-maiz); color: var(--accent-deep); border: 1px solid var(--accent-deep); padding: 0.25rem 0.65rem; border-radius: 99px; font-size: 0.78rem; font-weight: 700; }
+.badge-danger {
+  background: var(--c-maiz);
+  color: var(--accent-deep);
+  border: 1px solid var(--accent-deep);
+  padding: 0.26rem 0.7rem;
+  border-radius: 99px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+  white-space: nowrap;
+  line-height: 1.2;
+}
 
 /* CONTROL NUMERICO DE ENTRADAS Y SALIDAS */
 .kardex-controls { display: flex; align-items: center; gap: 0.4rem; }
@@ -1807,7 +1839,7 @@ svg { width: 18px; height: 18px; stroke-width: 2.1; flex-shrink: 0; }
 }
 
 /* ==========================================================================
-   IMPLEMENTACION NUEVA: CARRITO, PAGO EN LINEA / TIENDA Y SEGUIMIENTO PEDIDOS
+   IMPLEMENTACION: CARRITO, PAGO EN LINEA / TIENDA Y SEGUIMIENTO PEDIDOS
    ========================================================================== */
 .cart-nav-btn {
   background: rgba(254, 250, 224, 0.14);
@@ -1884,13 +1916,13 @@ svg { width: 18px; height: 18px; stroke-width: 2.1; flex-shrink: 0; }
   border-top: 1px dashed var(--border-color);
 }
 .store-prod-qty {
-  width: 58px;
-  height: 32px;
+  width: 44px;
+  height: 30px;
   text-align: center;
   font-weight: 700;
   font-size: 0.82rem;
   border: 1px solid var(--border-color);
-  border-radius: 7px;
+  border-radius: 6px;
   background: var(--bg-surface);
   color: var(--text-main);
 }
@@ -1898,7 +1930,7 @@ svg { width: 18px; height: 18px; stroke-width: 2.1; flex-shrink: 0; }
 
 .btn-add-cart {
   flex: 1;
-  height: 32px;
+  height: 30px;
   background: var(--primary);
   color: var(--c-blanco);
   border: none;
@@ -1988,6 +2020,7 @@ svg { width: 18px; height: 18px; stroke-width: 2.1; flex-shrink: 0; }
   display: flex;
   align-items: center;
   gap: 0.4rem;
+  flex-wrap: wrap;
 }
 .cart-qty-btn {
   width: 28px;
@@ -2002,6 +2035,10 @@ svg { width: 18px; height: 18px; stroke-width: 2.1; flex-shrink: 0; }
   place-items: center;
 }
 .cart-qty-btn:hover { background: var(--bg-tint); }
+.cart-qty-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
 .cart-qty-val {
   min-width: 44px;
   text-align: center;
@@ -2189,4 +2226,318 @@ svg { width: 18px; height: 18px; stroke-width: 2.1; flex-shrink: 0; }
 
 @media (max-width: 900px) {
   .payment-options, .order-progress-track { grid-template-columns: 1fr; }
+}
+
+/* ==========================================================================
+   AJUSTES SOLICITADOS: REGISTRO VENDEDOR, STEPPER TIENDA, STOCK MAX Y PROVEEDORES
+   ========================================================================== */
+.reg-helper-box,
+.reg-geo-box {
+  background: var(--bg-tint);
+  border: 1px solid rgba(45, 106, 79, 0.28);
+  border-radius: var(--radius-md);
+  padding: 0.72rem 0.85rem;
+  margin-bottom: 0.9rem;
+}
+
+.reg-helper-header,
+.reg-geo-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.55rem;
+  flex-wrap: wrap;
+  font-size: 0.8rem;
+  color: var(--primary-dark);
+}
+.reg-helper-header span,
+.reg-geo-header strong {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.btn-link-mini {
+  background: var(--bg-surface);
+  color: var(--primary-dark);
+  border: 1px solid rgba(45, 106, 79, 0.3);
+  padding: 0.25rem 0.65rem;
+  border-radius: 99px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: var(--transition);
+}
+.btn-link-mini:hover {
+  background: var(--primary);
+  color: var(--c-blanco);
+}
+
+.reg-asistente-panel {
+  margin-top: 0.65rem;
+  padding-top: 0.65rem;
+  border-top: 1px dashed rgba(45, 106, 79, 0.3);
+}
+
+.reg-asistente-log {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  max-height: 135px;
+  overflow-y: auto;
+  margin-bottom: 0.5rem;
+  padding-right: 0.2rem;
+}
+
+.reg-asistente-input-row {
+  display: flex;
+  gap: 0.4rem;
+}
+.reg-asistente-input-row input {
+  flex: 1;
+  padding: 0.45rem 0.7rem;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-surface);
+  font-size: 0.82rem;
+}
+
+.reg-seller-map-wrap {
+  margin-top: 0.65rem;
+}
+.reg-seller-map {
+  width: 100%;
+  height: 175px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  overflow: hidden;
+  z-index: 1;
+}
+
+/* STEPPER (- / NUMERO / +) EN DISPONIBILIDAD ACTUAL DE TIENDA */
+.store-qty-stepper {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.22rem;
+}
+.btn-step-qty {
+  width: 26px;
+  height: 30px;
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-surface);
+  color: var(--primary-dark);
+  font-weight: 800;
+  font-size: 0.9rem;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  transition: var(--transition);
+}
+.btn-step-qty:hover:not(:disabled) {
+  background: var(--bg-tint);
+  border-color: var(--primary);
+}
+.btn-step-qty:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* ETIQUETA DE STOCK MAXIMO EN CARRITO */
+.cart-max-stock-msg {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  background: var(--accent-warm);
+  color: var(--text-main);
+  padding: 0.16rem 0.55rem;
+  border-radius: 99px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+/* PROVEEDORES REGISTRADOS EN ADMINISTRACION DE PEDIDOS */
+.providers-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-bottom: 0.85rem;
+}
+.provider-chip {
+  background: var(--bg-tint);
+  border: 1px solid rgba(45, 106, 79, 0.28);
+  border-radius: 8px;
+  padding: 0.42rem 0.65rem;
+  font-size: 0.76rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: var(--primary-dark);
+}
+.provider-chip small {
+  color: var(--text-muted);
+  font-weight: 600;
+}
+/* =========================================================
+   CORRECCIONES VISUALES Y ANIMACIONES DECORATIVAS SUAVES
+   ========================================================= */
+
+/* 1. Contraste blanco nítido en botón Agregar del carrito */
+.btn-add-cart,
+.btn-add-cart span,
+.btn-add-cart svg {
+  color: #ffffff !important;
+}
+
+.btn-add-cart {
+  transition: transform 0.18s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+}
+
+.btn-add-cart:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 14px rgba(45, 106, 79, 0.25);
+}
+
+.btn-add-cart:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+/* 2. Separación limpia del directorio de proveedores respecto a los pedidos */
+.providers-strip {
+  background: #f8faf9;
+  border: 1px dashed #cbd5e1;
+  border-radius: 12px;
+  padding: 0.7rem 0.85rem;
+  margin-bottom: 1rem;
+}
+
+.providers-box-title {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #334155;
+  margin-bottom: 0.5rem;
+}
+
+.providers-box-title svg {
+  width: 14px;
+  height: 14px;
+  color: #2d6a4f;
+}
+
+.providers-chips-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.provider-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  background: #ffffff;
+  border: 1px solid #d1fae5;
+  border-radius: 999px;
+  padding: 0.3rem 0.65rem;
+  font-size: 0.8rem;
+  color: #1b4332;
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.provider-chip:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.05);
+}
+
+/* 3. Animación en cascada al desplegar "Todos" y subcategorías */
+@keyframes chipCascadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.chip-cascade-in,
+.chip-animate {
+  animation: chipCascadeIn 0.26s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.filter-chips .chip,
+.filter-chips .subchip {
+  transition: transform 0.18s ease, background-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.filter-chips .chip:hover,
+.filter-chips .subchip:hover {
+  transform: translateY(-1px);
+}
+
+.filter-chips .chip:active,
+.filter-chips .subchip:active {
+  transform: scale(0.96);
+}
+
+/* 4. Rebote sutil en contador del carrito al agregar artículos */
+@keyframes badgeBump {
+  0% { transform: scale(1); }
+  35% { transform: scale(1.28); }
+  70% { transform: scale(0.92); }
+  100% { transform: scale(1); }
+}
+
+.badge-bump {
+  animation: badgeBump 0.36s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* 5. Transiciones suaves en tarjetas, modales y cambio de pestañas */
+@keyframes tabFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.tab-fade-in {
+  animation: tabFadeIn 0.24s ease-out;
+}
+
+.store-prod-card,
+.drawer-store-card,
+.kpi-card,
+.order-card,
+.restock-item {
+  transition: transform 0.2s ease, box-shadow 0.22s ease, border-color 0.2s ease;
+}
+
+.store-prod-card:hover,
+.drawer-store-card:hover,
+.kpi-card:hover,
+.order-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.06);
+}
+
+.btn-store-preview,
+.cart-nav-btn,
+.geo-pill,
+.btn-drawer-trigger {
+  transition: transform 0.18s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+}
+
+.btn-store-preview:hover,
+.cart-nav-btn:hover,
+.geo-pill:hover,
+.btn-drawer-trigger:hover {
+  transform: translateY(-1px);
 }
