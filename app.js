@@ -798,18 +798,16 @@ configurarControles() {
       boton.addEventListener('click', () => {
 
         this.filtrarPorCategoria(boton.dataset.cat);
+        
 
         // Marcar visualmente el botón seleccionado
         document.querySelectorAll('[data-cat]').forEach(b => {
           b.classList.remove('active');
-        });
+          });
 
         boton.classList.add('active');
 
       });
-
-    });
-
 },
 
 
