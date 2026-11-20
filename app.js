@@ -1106,14 +1106,14 @@ const MAP_HOOKS = {
     this.mapInstance = L.map('map').setView([ubicacionUsuario.lat, ubicacionUsuario.lng], 15);
 
 L.tileLayer(
-  'https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png',
-  {
-    attribution: '© OpenStreetMap contributors © CARTO',
-    subdomains: 'abcd',
-    maxZoom: 19,
-    keepBuffer: 4,
-    updateWhenZooming: false
-  }
+      'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',
+      {
+        attribution: 'Tiles © Esri',
+        maxZoom: 19,
+        maxNativeZoom: 19,
+        keepBuffer: 4,
+        updateWhenZooming: false
+      }
 ).addTo(this.mapInstance);
 
     this.mapInstance.on('click', e => {
