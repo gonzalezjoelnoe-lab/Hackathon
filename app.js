@@ -88,169 +88,820 @@ const DB_HOOKS = {
 /* =========================================================
    APARTADO DE CONEXION AL MAPA (LEAFLET)
    ========================================================= */
+/* =========================================================
+   NEXOLOCAL - RADAR LOCAL
+   LEAFLET + SUPABASE
+   ========================================================= */
+
 const MAP_HOOKS = {
 
   map: null,
   capaMarcadores: null,
   productoresCache: [],
+  marcadores: {},
+  primeraCarga: true,
+  cargando: false,
+  suscripcion: null,
+  ubicacionUsuario: null,
+  categoriaActual: 'todos',
+  busquedaActual: '',
+  radioActual: 5000,
+
+  // Categorías visibles de la interfaz y valores de Supabase
+  categorias: {
+    todos: null,
+    produccion: 'Alimentos',
+    tiendas: 'Tiendita',
+    insumos: 'Papeleria',
+    talleres: 'Artesanias'
+  },
 
   esc(texto) {
     return String(texto ?? '').replace(/[&<>"']/g, c => ({
-      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;'
     }[c]));
   },
 
   inicializar() {
-    // 1. Si el mapa ya existe, solo recalcular su tamaño al volver a la vista
+
     if (this.map) {
-      setTimeout(() => this.map.invalidateSize(), 200);
+      setTimeout(() => this.map.invalidateSize(true), 250);
       return;
     }
 
     const contenedor = document.getElementById('map');
-    if (!contenedor) return;
 
-    // 2. Inicializar mapa centrado en Durango
-    this.map = L.map('map').setView([24.0298, -104.6506], 15);
+    if (!contenedor) {
+      console.error('No se encontró el contenedor #map');
+      return;
+    }
+
+    // Inicialización del mapa
+    this.map = L.map('map', {
+      center: [24.0298, -104.6506],
+      zoom: 14,
+      minZoom: 4,
+      maxZoom: 19,
+      zoomControl: true,
+      scrollWheelZoom: true,
+      doubleClickZoom: true,
+      dragging: true,
+      zoomAnimation: true,
+      markerZoomAnimation: true,
+      preferCanvas: true
+    });
+
+    // Mapa de calles
+    L.tileLayer(
+      'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',
+      {
+        attribution: 'Tiles © Esri',
+        maxZoom: 19,
+        maxNativeZoom: 19,
+        keepBuffer: 4,
+        updateWhenZooming: false
+      }
+    ).addTo(this.map);
+
     this.capaMarcadores = L.layerGroup().addTo(this.map);
 
-    document.getElementById('map-empty-state')?.remove();
-    setTimeout(() => this.map.invalidateSize(), 300);
+    // Evitar problemas de tamaño al abrir pestañas o paneles
+    setTimeout(() => {
+      this.map.invalidateSize(true);
+    }, 400);
 
-    // 3. Capas base de Esri
-    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
-      attribution: 'Tiles &copy; Esri',
-      maxNativeZoom: 16,
-      maxZoom: 19
-    }).addTo(this.map);
+    this.configurarControles();
 
-    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Reference/MapServer/tile/{z}/{y}/{x}', {
-      maxNativeZoom: 16,
-      maxZoom: 19
-    }).addTo(this.map);
-
-    // 4. Cargar datos
     this.cargarMapa();
+
+    this.conectarRealtime();
   },
+
+  // =======================================================
+  // CARGA DE SUPABASE
+  // =======================================================
 
   async cargarMapa() {
-    // Validación de seguridad por si supabaseClient aún no se inicializa en el HTML
+
+    if (this.cargando) return;
+
     if (typeof supabaseClient === 'undefined') {
-      console.warn('supabaseClient no está definido. Usando datos locales de demostración.');
-      this.productoresCache = [
-        {
-          id: 'demo-prod-1',
-          nombre_negocio: 'Productor Local Durango',
-          whatsapp: '6180000000',
-          historia: 'Producción artesanal local.',
-          latitud: 24.0298,
-          longitud: -104.6506,
-          productos: inventarioLocal
+      console.error('supabaseClient no está inicializado');
+      return;
+    }
+
+    this.cargando = true;
+
+    try {
+
+      // Consultar negocios con ubicación
+      const { data: negocios, error: errorNegocios } =
+        await supabaseClient
+          .from('negocios_publicos')
+          .select(`
+            id,
+            nombre_negocio,
+            giro,
+            historia,
+            latitud,
+            longitud,
+            verificado
+          `);
+
+      if (errorNegocios) throw errorNegocios;
+
+      const lista = negocios || [];
+
+      // Si no hay negocios
+      if (!lista.length) {
+
+        this.productoresCache = [];
+
+        this.pintarMarcadores([]);
+
+        return;
+      }
+
+      // Consultar productos asociados
+      const ids = lista.map(n => n.id);
+
+      const { data: productos, error: errorProductos } =
+        await supabaseClient
+          .from('productos')
+          .select(`
+            id,
+            negocio_id,
+            nombre,
+            categoria,
+            descripcion,
+            precio,
+            stock_actual,
+            imagen_url
+          `)
+          .in('negocio_id', ids)
+          .gt('stock_actual', 0);
+
+      if (errorProductos) throw errorProductos;
+
+      // Relacionar negocios y productos
+      const productosPorNegocio = {};
+
+      (productos || []).forEach(producto => {
+
+        if (!productosPorNegocio[producto.negocio_id]) {
+          productosPorNegocio[producto.negocio_id] = [];
         }
-      ];
-      this.pintarMarcadores(this.productoresCache);
-      return;
+
+        productosPorNegocio[producto.negocio_id].push(producto);
+      });
+
+      this.productoresCache = lista.map(negocio => ({
+        ...negocio,
+        latitud: Number(negocio.latitud),
+        longitud: Number(negocio.longitud),
+        productos: productosPorNegocio[negocio.id] || []
+      }));
+
+      this.aplicarFiltros();
+
+    } catch (error) {
+
+      console.error('Error al cargar Radar Local:', error);
+
+    } finally {
+
+      this.cargando = false;
+
     }
-
-    const { data: productores, error } = await supabaseClient
-      .from('productores')
-      .select(`
-        id,
-        nombre_negocio,
-        whatsapp,
-        historia,
-        latitud,
-        longitud,
-        productos (
-          id,
-          nombre,
-          categoria,
-          descripcion,
-          precio,
-          imagen_url
-        )
-      `);
-
-    if (error) {
-      console.error('Error al consultar Supabase:', error.message);
-      return;
-    }
-
-    this.productoresCache = productores || [];
-    this.pintarMarcadores(this.productoresCache);
   },
 
-  pintarMarcadores(listaProductores) {
-    if (!this.map || !this.capaMarcadores) return;
-    this.capaMarcadores.clearLayers();
+  // =======================================================
+  // ICONOS DE LOS NEGOCIOS
+  // =======================================================
 
-    const iconoProductor = L.divIcon({
-      className: 'pin-custom',
-      html: '<div class="pin"><span>🌿</span></div>',
-      iconSize: [40, 48],
-      iconAnchor: [20, 48],
-      popupAnchor: [0, -44]
-    });
+  crearIcono(giro) {
 
-    const marcadores = [];
+    const iconos = {
+      Alimentos: '🌱',
+      Tiendita: '🏪',
+      Papeleria: '📦',
+      Artesanias: '🛠️'
+    };
 
-    listaProductores.forEach(prod => {
-      if (prod.latitud == null || prod.longitud == null) return;
+    const color = {
+      Alimentos: '#238b45',
+      Tiendita: '#d69a27',
+      Papeleria: '#3578c8',
+      Artesanias: '#9b62b0'
+    };
 
-      const listaProductosHTML = (prod.productos && prod.productos.length > 0)
-        ? prod.productos.map(item => `
-            <div class="producto-item">
-              ${item.imagen_url ? `<img src="${this.esc(item.imagen_url)}" alt="${this.esc(item.nombre)}" class="producto-img">` : ''}
-              ${item.categoria ? `<span class="badge-cat">${this.esc(item.categoria)}</span><br>` : ''}
-              <div class="producto-titulo">${this.esc(item.nombre)} — <span class="producto-precio">$${this.esc(item.precio)}</span></div>
-              ${item.descripcion ? `<p class="producto-desc">${this.esc(item.descripcion)}</p>` : ''}
-            </div>
-          `).join('')
-        : '<p class="producto-desc"><em>Este productor aún no tiene productos cargados.</em></p>';
+    const emoji = iconos[giro] || '📍';
+    const fondo = color[giro] || '#238b45';
 
-      const mensajeWA = encodeURIComponent(`Hola ${prod.nombre_negocio}, vi sus productos en el mapa y me gustaría hacer un pedido.`);
-      const telefono = String(prod.whatsapp ?? '').replace(/\D/g, '');
+    return L.divIcon({
 
-      const popupHTML = `
-        <div class="popup-card">
-          <h3>${this.esc(prod.nombre_negocio)}</h3>
-          ${prod.historia ? `<p class="popup-historia">${this.esc(prod.historia)}</p>` : ''}
-          ${listaProductosHTML}
-          <a href="https://wa.me/${telefono}?text=${mensajeWA}" target="_blank" rel="noopener" class="btn-wa">
-            Pedir por WhatsApp
-          </a>
+      className: 'radar-marker',
+
+      html: `
+        <div class="radar-pin" style="--pin-color:${fondo}">
+          <span>${emoji}</span>
         </div>
+      `,
+
+      iconSize: [42, 50],
+
+      // La punta inferior es la coordenada GPS
+      iconAnchor: [21, 50],
+
+      popupAnchor: [0, -45]
+
+    });
+  },
+
+  // =======================================================
+  // VENTANA DE INFORMACIÓN
+  // =======================================================
+
+  crearPopup(negocio) {
+
+    const productos = negocio.productos || [];
+
+    const productosHTML = productos.length
+
+      ? productos.map(producto => `
+
+          <div class="radar-producto">
+
+            ${producto.imagen_url ? `
+              <img
+                src="${this.esc(producto.imagen_url)}"
+                alt="${this.esc(producto.nombre)}"
+                loading="lazy"
+              >
+            ` : ''}
+
+            <div class="radar-producto-info">
+
+              <strong>
+                ${this.esc(producto.nombre)}
+              </strong>
+
+              <span class="radar-precio">
+                $${this.esc(producto.precio)}
+              </span>
+
+              <small>
+                ${this.esc(producto.categoria)}
+              </small>
+
+              <small>
+                Disponibles: ${this.esc(producto.stock_actual)}
+              </small>
+
+              ${producto.descripcion ? `
+                <p>${this.esc(producto.descripcion)}</p>
+              ` : ''}
+
+            </div>
+
+          </div>
+
+        `).join('')
+
+      : `
+        <p class="radar-sin-productos">
+          Este negocio aún no tiene productos disponibles.
+        </p>
       `;
 
-      const marker = L.marker([prod.latitud, prod.longitud], { icon: iconoProductor })
-        .addTo(this.capaMarcadores)
-        .bindPopup(popupHTML, { maxWidth: 280 });
+    return `
 
-      marcadores.push(marker);
+      <div class="radar-popup">
+
+        <div class="radar-popup-header">
+
+          <h3>${this.esc(negocio.nombre_negocio)}</h3>
+
+          ${negocio.verificado ? `
+            <span class="radar-verificado">
+              ✓ Verificado
+            </span>
+          ` : ''}
+
+        </div>
+
+        <span class="radar-giro">
+          ${this.esc(negocio.giro)}
+        </span>
+
+        ${negocio.historia ? `
+          <p class="radar-historia">
+            ${this.esc(negocio.historia)}
+          </p>
+        ` : ''}
+
+        <div class="radar-lista-productos">
+
+          <h4>Productos disponibles</h4>
+
+          ${productosHTML}
+
+        </div>
+
+        <button
+          type="button"
+          class="radar-whatsapp"
+          data-negocio="${this.esc(negocio.id)}"
+        >
+          Consultar por WhatsApp
+        </button>
+
+      </div>
+
+    `;
+  },
+
+  // =======================================================
+  // PINTAR MARCADORES
+  // =======================================================
+
+  pintarMarcadores(lista) {
+
+    if (!this.map || !this.capaMarcadores) return;
+
+    this.capaMarcadores.clearLayers();
+
+    this.marcadores = {};
+
+    lista.forEach(negocio => {
+
+      const lat = Number(negocio.latitud);
+      const lng = Number(negocio.longitud);
+
+      if (
+        !Number.isFinite(lat) ||
+        !Number.isFinite(lng) ||
+        lat < -90 || lat > 90 ||
+        lng < -180 || lng > 180
+      ) return;
+
+      const marker = L.marker(
+        [lat, lng],
+        {
+          icon: this.crearIcono(negocio.giro),
+          riseOnHover: true,
+          autoPanOnFocus: false
+        }
+      );
+
+      marker.bindPopup(
+        this.crearPopup(negocio),
+        {
+          maxWidth: 330,
+          minWidth: 250,
+          autoPan: true,
+          keepInView: true
+        }
+      );
+
+      marker.addTo(this.capaMarcadores);
+
+      this.marcadores[negocio.id] = marker;
+
+      // Contacto protegido mediante RPC
+      marker.on('popupopen', () => {
+        this.configurarWhatsApp(negocio.id);
+      });
+
     });
 
-    if (marcadores.length > 0) {
-      this.map.fitBounds(L.featureGroup(marcadores).getBounds().pad(0.2), { maxZoom: 16 });
+    // Encuadrar negocios solamente en la primera carga
+    // Los filtros nunca modifican el zoom ni el centro.
+    if (this.primeraCarga) {
+
+      const markers = Object.values(this.marcadores);
+
+      if (markers.length) {
+
+        const grupo = L.featureGroup(markers);
+
+        this.map.fitBounds(
+          grupo.getBounds().pad(0.15),
+          {
+            maxZoom: 15,
+            animate: false
+          }
+        );
+
+      }
+
+      this.primeraCarga = false;
+
+    }
+
+    this.actualizarContador(lista.length);
+  },
+
+  // =======================================================
+  // WHATSAPP
+  // =======================================================
+
+  async configurarWhatsApp(negocioId) {
+
+    const popup = this.map.getPopup();
+
+    if (!popup) return;
+
+    const enlace = popup
+      .getElement()
+      ?.querySelector('.radar-whatsapp');
+
+    if (!enlace) return;
+
+    enlace.onclick = null;
+
+    try {
+
+      const { data: sesion } =
+        await supabaseClient.auth.getSession();
+
+      if (!sesion.session) {
+
+        enlace.textContent = 'Inicia sesión para contactar';
+
+        enlace.onclick = (e) => {
+          e.preventDefault();
+          alert('Inicia sesión para consultar el WhatsApp.');
+        };
+
+        return;
+      }
+
+      const { data: telefono, error } =
+        await supabaseClient.rpc(
+          'obtener_whatsapp',
+          {
+            p_negocio_id: negocioId
+          }
+        );
+
+      if (error) throw error;
+
+      const numero = String(telefono || '').replace(/\D/g, '');
+
+      if (!numero) {
+
+        enlace.textContent = 'WhatsApp no disponible';
+
+        return;
+      }
+
+      const negocio = this.productoresCache.find(
+        n => n.id === negocioId
+      );
+
+      const mensaje = encodeURIComponent(
+        `Hola ${negocio?.nombre_negocio || ''}, encontré tu negocio en NexoLocal y me interesan tus productos.`
+      );
+
+      enlace.onclick = (e) => {
+
+        e.preventDefault();
+
+        const url = `https://wa.me/${numero}?text=${mensaje}`;
+
+        window.open(url, '_blank', 'noopener,noreferrer');
+
+      };
+
+    } catch (error) {
+
+      console.error('Error WhatsApp:', error);
+
+      enlace.textContent = 'Contacto no disponible';
+
     }
   },
 
-  filtrarPorCategoria(categoria, subcategoria = 'todas') {
-    if (categoria === 'todos') {
-      this.pintarMarcadores(this.productoresCache);
+  // =======================================================
+  // FILTROS
+  // =======================================================
+
+  aplicarFiltros() {
+
+    let resultado = [...this.productoresCache];
+
+    // Filtro por giro
+    const giro = this.categorias[this.categoriaActual];
+
+    if (giro) {
+      resultado = resultado.filter(
+        negocio => negocio.giro === giro
+      );
+    }
+
+    // Búsqueda de negocios y productos
+    const texto = this.busquedaActual
+      .trim()
+      .toLowerCase();
+
+    if (texto) {
+
+      resultado = resultado.filter(negocio => {
+
+        const coincideNegocio =
+          negocio.nombre_negocio?.toLowerCase().includes(texto);
+
+        const coincideGiro =
+          negocio.giro?.toLowerCase().includes(texto);
+
+        const coincideProducto =
+          negocio.productos.some(producto =>
+
+            producto.nombre?.toLowerCase().includes(texto) ||
+            producto.categoria?.toLowerCase().includes(texto) ||
+            producto.descripcion?.toLowerCase().includes(texto)
+
+          );
+
+        return coincideNegocio || coincideGiro || coincideProducto;
+
+      });
+
+    }
+
+    // Radio desde la ubicación del comprador
+    if (this.ubicacionUsuario) {
+
+      resultado = resultado.filter(negocio => {
+
+        const distancia = this.distanciaMetros(
+          this.ubicacionUsuario.lat,
+          this.ubicacionUsuario.lng,
+          negocio.latitud,
+          negocio.longitud
+        );
+
+        return distancia <= this.radioActual;
+
+      });
+
+    }
+
+    this.pintarMarcadores(resultado);
+
+    return resultado;
+  },
+
+  filtrarPorCategoria(categoria = 'todos') {
+
+    this.categoriaActual = categoria;
+
+    return this.aplicarFiltros();
+  },
+
+  buscar(texto) {
+
+    this.busquedaActual = texto || '';
+
+    return this.aplicarFiltros();
+  },
+
+  // =======================================================
+  // DISTANCIA GPS
+  // =======================================================
+
+  distanciaMetros(lat1, lon1, lat2, lon2) {
+
+    const R = 6371000;
+
+    const rad = grados => grados * Math.PI / 180;
+
+    const dLat = rad(lat2 - lat1);
+    const dLon = rad(lon2 - lon1);
+
+    const a =
+      Math.sin(dLat / 2) ** 2 +
+      Math.cos(rad(lat1)) *
+      Math.cos(rad(lat2)) *
+      Math.sin(dLon / 2) ** 2;
+
+    return 2 * R * Math.atan2(
+      Math.sqrt(a),
+      Math.sqrt(1 - a)
+    );
+  },
+
+  localizarUsuario() {
+
+    if (!navigator.geolocation) {
+
+      alert('Tu navegador no permite obtener la ubicación GPS.');
+
       return;
     }
 
-    const filtrados = this.productoresCache.filter(prod =>
-      (prod.productos || []).some(p => {
-        const coincideCat = p.categoria === categoria;
-        const coincideSub = subcategoria === 'todas' || p.subcategoria === subcategoria;
-        return coincideCat && coincideSub;
-      })
-    );
+    navigator.geolocation.getCurrentPosition(
 
-    this.pintarMarcadores(filtrados);
+      posicion => {
+
+        const lat = posicion.coords.latitude;
+        const lng = posicion.coords.longitude;
+
+        this.ubicacionUsuario = { lat, lng };
+
+        this.map.setView([lat, lng], 15, {
+          animate: true
+        });
+
+        if (this.markerUsuario) {
+          this.map.removeLayer(this.markerUsuario);
+        }
+
+        const iconoUsuario = L.divIcon({
+
+          className: 'radar-user-marker',
+
+          html: `
+            <div class="radar-user-dot"></div>
+          `,
+
+          iconSize: [22, 22],
+          iconAnchor: [11, 11]
+
+        });
+
+        this.markerUsuario = L.marker(
+          [lat, lng],
+          { icon: iconoUsuario, zIndexOffset: 1000 }
+        ).addTo(this.map);
+
+        this.markerUsuario.bindPopup('Tu ubicación actual');
+
+        this.aplicarFiltros();
+
+      },
+
+      error => {
+
+        console.error('Error GPS:', error);
+
+        alert('No pudimos obtener tu ubicación. Revisa los permisos del navegador.');
+
+      },
+
+      {
+        enableHighAccuracy: true,
+        timeout: 15000,
+        maximumAge: 30000
+      }
+
+    );
+  },
+
+  // =======================================================
+  // CONTROLES DE INTERFAZ
+  // =======================================================
+
+  configurarControles() {
+
+    const buscador = document.getElementById('map-search');
+
+    if (buscador) {
+
+      buscador.addEventListener('input', e => {
+        this.buscar(e.target.value);
+      });
+
+    }
+
+    const radio = document.getElementById('map-radius');
+
+    if (radio) {
+
+      radio.addEventListener('change', e => {
+
+        this.radioActual = Number(e.target.value);
+
+        this.aplicarFiltros();
+
+      });
+
+    }
+
+    const gps = document.getElementById('map-my-location');
+
+    if (gps) {
+      gps.addEventListener('click', () => {
+        this.localizarUsuario();
+      });
+    }
+
+  },
+
+  actualizarContador(total) {
+
+    const elemento = document.getElementById('map-business-count');
+
+    if (elemento) {
+      elemento.textContent = `${total} negocios encontrados`;
+    }
+
+  },
+
+  // =======================================================
+  // ACTUALIZACIÓN EN TIEMPO REAL
+  // =======================================================
+
+  conectarRealtime() {
+
+    if (this.suscripcion) return;
+
+    this.suscripcion = supabaseClient
+      .channel('nexolocal-radar')
+
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'productos'
+        },
+        () => this.programarActualizacion()
+      )
+
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'negocios'
+        },
+        () => this.programarActualizacion()
+      )
+
+      .subscribe(status => {
+        console.log('Radar Realtime:', status);
+      });
+
+  },
+
+  programarActualizacion() {
+
+    clearTimeout(this.actualizacionPendiente);
+
+    this.actualizacionPendiente = setTimeout(() => {
+
+      this.cargarMapa();
+
+    }, 700);
+
+  },
+
+  actualizar() {
+    return this.cargarMapa();
+  },
+
+  destruir() {
+
+    if (this.suscripcion) {
+
+      supabaseClient.removeChannel(this.suscripcion);
+
+      this.suscripcion = null;
+
+    }
+
+    if (this.map) {
+
+      this.map.remove();
+
+      this.map = null;
+      this.capaMarcadores = null;
+      this.marcadores = {};
+
+    }
+
   }
+
 };
+
+// Inicializar cuando el HTML esté listo
+if (document.readyState === 'loading') {
+
+  document.addEventListener('DOMContentLoaded', () => {
+    MAP_HOOKS.inicializar();
+  });
+
+} else {
+
+  MAP_HOOKS.inicializar();
+
+}
 
 /* =========================================================
    VALIDACION ESTRICTA DE NUMEROS Y CONTRASENAS
