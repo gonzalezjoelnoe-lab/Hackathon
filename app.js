@@ -1678,7 +1678,38 @@ function seleccionarFiltroTienda(filtro, boton) {
   renderizarDirectorioTiendas();
 }
 
+function sincronizarHorariosTiendas() {
+  const ahora = new Date();
+  const minutosActuales = ahora.getHours() * 60 + ahora.getMinutes();
+
+  const aMinutos = hhmm => {
+    const [h, m] = hhmm.split(':').map(Number);
+    return h * 60 + (m || 0);
+  };
+
+  tiendasRegistradas.forEach(t => {
+    if (!t._horaCierre) {
+      const horas = (t.horario || '').match(/\b\d{1,2}:\d{2}\b/g) || [];
+      if (horas.length >= 2) {
+        t._horaApertura = t.horaApertura || horas[0];
+        t._horaCierre = t.horaCierre || horas[1];
+      } else {
+        t._horaApertura = t.horaApertura || (t.id === 'tienda-3' ? '07:00' : '08:00');
+        t._horaCierre = t.horaCierre || horas[0] || '20:00';
+      }
+    }
+
+    const inicio = aMinutos(t._horaApertura);
+    const fin = aMinutos(t._horaCierre);
+    const estaAbierto = minutosActuales >= inicio && minutosActuales < fin;
+
+    t.abierto = estaAbierto;
+    t.horario = estaAbierto ? `Cierra ${t._horaCierre}` : `Abre ${t._horaApertura}`;
+  });
+}
+
 function renderizarDirectorioTiendas() {
+  sincronizarHorariosTiendas();
   const listEl = document.getElementById('drawer-stores-list');
   const countLabel = document.getElementById('drawer-count-label');
   if (!listEl) return;
