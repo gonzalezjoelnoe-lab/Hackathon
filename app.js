@@ -1103,7 +1103,7 @@ const MAP_HOOKS = {
 
   inicializar() {
     if (this.mapInstance) return;
-   this.mapInstance = L.map('map').setView([ubicacionUsuario.lat, ubicacionUsuario.lng], 15);
+    this.mapInstance = L.map('map').setView([ubicacionUsuario.lat, ubicacionUsuario.lng], 15);
 
 L.tileLayer(
   'https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png',
