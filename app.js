@@ -9,6 +9,7 @@ let filtroTiendaActivo = 'todos';
 let tiendaSeleccionadaModal = null;
 let categoriaMapaActiva = 'todos';
 let subcategoriaMapaActiva = 'todas';
+let categoriasBarraExpandidas = false;
 
 // Estado de Geolocalización del Comprador
 let ubicacionUsuario = {
@@ -19,11 +20,37 @@ let ubicacionUsuario = {
 };
 let modoPinManualActivo = false;
 
+// Estado de Ubicación del Vendedor en Registro (Radio máximo 500 m)
+let ubicacionRegistroGPS = null;
+let ubicacionRegistroTienda = null;
+let mapaRegistroVendedor = null;
+let marcadorRegistroVendedor = null;
+let circuloRegistro500m = null;
+
 // Estado de Temporada Alta del Vendedor
 let modoTemporadaAltaActivo = JSON.parse(localStorage.getItem('nexolocal_temporada_activa') || 'false');
 let stocksTemporadaEditados = JSON.parse(localStorage.getItem('nexolocal_stocks_temporada') || '{}');
 let productosExcluidosTemporada = JSON.parse(localStorage.getItem('nexolocal_excluidos_temporada') || '[]');
 let solicitudesProveedores = JSON.parse(localStorage.getItem('nexolocal_solicitudes_prov') || '{}');
+
+// Proveedores registrados del vendedor (limpio y compatible con formatos previos)
+let proveedoresLocal = (() => {
+  try {
+    const raw = JSON.parse(localStorage.getItem('nexolocal_proveedores') || '[]');
+    if (!Array.isArray(raw)) return [];
+    return raw
+      .filter(p => p && p.nombre)
+      .map((p, i) => ({
+        id: p.id || `prov-${i}-${Date.now()}`,
+        nombre: p.nombre,
+        categoria: p.categoria || p.giro || 'General',
+        telefono: p.telefono || p.contacto || '',
+        productos: p.productos || p.notas || ''
+      }));
+  } catch {
+    return [];
+  }
+})();
 
 // Estado de Carrito (solo comprador, no se envía al vendedor hasta confirmar pago) y Pedidos Activos
 let carritoCompras = JSON.parse(localStorage.getItem('nexolocal_carrito') || '[]');
@@ -158,7 +185,6 @@ let inventarioLocal = [
   }
 ];
 
-// Historial mensual de salidas del negocio para detección automática de Temporada Alta
 let historialVentasMensual = [
   {
     mes: 'Enero - Febrero',
@@ -758,8 +784,44 @@ function guardarYGenerarResurtidoTemporada() {
 }
 
 /* =========================================================
-   REABASTECIMIENTO A PROVEEDORES (SOLICITAR UNO O SOLICITAR TODO)
+   REABASTECIMIENTO Y DIRECTORIO DE PROVEEDORES (LIMPIO Y SEPARADO)
    ========================================================= */
+function guardarProveedoresLocal() {
+  localStorage.setItem('nexolocal_proveedores', JSON.stringify(proveedoresLocal));
+}
+
+function abrirModalNuevoProveedor() {
+  poblarSelectCategorias('prov-categoria');
+  document.getElementById('modal-nuevo-proveedor').classList.remove('hidden');
+  lucide.createIcons();
+}
+
+async function guardarNuevoProveedor(event) {
+  event.preventDefault();
+  const nuevo = {
+    id: `prov-${Date.now()}`,
+    nombre: document.getElementById('prov-nombre').value.trim(),
+    categoria: document.getElementById('prov-categoria').value,
+    telefono: document.getElementById('prov-telefono').value.trim(),
+    productos: document.getElementById('prov-productos').value.trim()
+  };
+
+  proveedoresLocal.unshift(nuevo);
+  guardarProveedoresLocal();
+  if (typeof DB_HOOKS.registrarProveedor === 'function') {
+    await DB_HOOKS.registrarProveedor(nuevo);
+  }
+  cerrarModal('modal-nuevo-proveedor');
+  event.target.reset();
+  actualizarListaReabastecimiento();
+}
+
+function eliminarProveedorLocal(provId) {
+  proveedoresLocal = proveedoresLocal.filter(p => p.id !== provId);
+  guardarProveedoresLocal();
+  actualizarListaReabastecimiento();
+}
+
 function obtenerFaltantesProveedores() {
   return inventarioLocal
     .map(item => {
@@ -773,7 +835,40 @@ function obtenerFaltantesProveedores() {
 function actualizarListaReabastecimiento() {
   const contenedor = document.getElementById('lista-pedidos-proveedores');
   const btnTodo = document.getElementById('btn-solicitar-todo');
+  const strip = document.getElementById('proveedores-registrados-wrap');
   if (!contenedor) return;
+
+  // Renderizar directorio de proveedores en un bloque separado antes de los pedidos
+  if (strip) {
+    if (proveedoresLocal.length === 0) {
+      strip.classList.add('hidden');
+      strip.innerHTML = '';
+    } else {
+      strip.classList.remove('hidden');
+      strip.innerHTML = `
+        <div class="providers-box-title">
+          <i data-lucide="contact"></i>
+          <span>Proveedores registrados (${proveedoresLocal.length})</span>
+        </div>
+        <div class="providers-chips-list">
+          ${proveedoresLocal.map(p => {
+            const detalle = [p.categoria, p.telefono].filter(Boolean).join(' · ');
+            return `
+              <div class="provider-chip" title="${p.productos || ''}">
+                <div>
+                  <strong>${p.nombre}</strong>
+                  ${detalle ? `<small> · ${detalle}</small>` : ''}
+                </div>
+                <button type="button" class="btn-remove-history" onclick="eliminarProveedorLocal('${p.id}')" title="Quitar proveedor">
+                  <i data-lucide="x"></i>
+                </button>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      `;
+    }
+  }
 
   const faltantes = obtenerFaltantesProveedores();
 
@@ -809,11 +904,24 @@ function actualizarListaReabastecimiento() {
 
   contenedor.innerHTML = faltantes.map(({ item, meta, pedir }) => {
     const yaSolicitado = solicitudesProveedores[item.id];
+    const provSugerido = proveedoresLocal.find(p => p.categoria === item.categoria) || proveedoresLocal[0];
+    const selectorHtml = proveedoresLocal.length > 0
+      ? `<div style="margin-top:0.35rem;">
+           <select id="select-prov-${item.id}" class="select-field" style="padding:0.28rem 0.55rem; font-size:0.78rem; width:auto; max-width:240px;">
+             ${proveedoresLocal.map(p => `<option value="${p.id}" ${provSugerido && p.id === provSugerido.id ? 'selected' : ''}>${p.nombre}</option>`).join('')}
+           </select>
+         </div>`
+      : '';
+
     return `
       <div class="restock-item ${yaSolicitado ? 'requested' : ''}">
         <div>
           <strong>${item.nombre}</strong>
           <small>Actual: ${item.stock} ${item.unidad} · Meta ${modoTemporadaAltaActivo ? 'Temporada Alta' : 'mínima'}: ${meta} ${item.unidad}</small>
+          ${yaSolicitado
+            ? `<small style="color:var(--primary-dark);font-weight:700;">Proveedor: ${yaSolicitado.proveedorNombre || 'Asignado'}</small>`
+            : selectorHtml
+          }
         </div>
         <div class="restock-actions">
           <span class="badge-danger">+${pedir} ${item.unidad}</span>
@@ -835,12 +943,17 @@ async function solicitarReabastecimientoIndividual(productoId) {
   const faltante = obtenerFaltantesProveedores().find(f => f.item.id === productoId);
   if (!faltante) return;
 
+  const selProv = document.getElementById(`select-prov-${productoId}`);
+  const provObj = proveedoresLocal.find(p => p.id === selProv?.value) || proveedoresLocal[0];
+  const proveedorNombre = provObj ? provObj.nombre : 'Proveedor local';
+
   const hora = new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
   solicitudesProveedores[productoId] = {
     productoId,
     nombre: faltante.item.nombre,
     cantidad: faltante.pedir,
     unidad: faltante.item.unidad,
+    proveedorNombre,
     hora
   };
   localStorage.setItem('nexolocal_solicitudes_prov', JSON.stringify(solicitudesProveedores));
@@ -850,7 +963,7 @@ async function solicitarReabastecimientoIndividual(productoId) {
 
   const fb = document.getElementById('reabastecimiento-feedback');
   if (fb) {
-    fb.textContent = `Orden enviada a proveedor: +${faltante.pedir} ${faltante.item.unidad} de ${faltante.item.nombre}.`;
+    fb.textContent = `Orden enviada a ${proveedorNombre}: +${faltante.pedir} ${faltante.item.unidad} de ${faltante.item.nombre}.`;
     fb.classList.remove('hidden');
   }
 }
@@ -863,11 +976,14 @@ async function solicitarTodoProveedores() {
   const lote = [];
 
   faltantes.forEach(f => {
+    const selProv = document.getElementById(`select-prov-${f.item.id}`);
+    const provObj = proveedoresLocal.find(p => p.id === selProv?.value) || proveedoresLocal.find(p => p.categoria === f.item.categoria) || proveedoresLocal[0];
     const reg = {
       productoId: f.item.id,
       nombre: f.item.nombre,
       cantidad: f.pedir,
       unidad: f.item.unidad,
+      proveedorNombre: provObj ? provObj.nombre : 'Proveedor local',
       hora
     };
     solicitudesProveedores[f.item.id] = reg;
@@ -1021,8 +1137,6 @@ function obtenerProductosTienda(tienda) {
 /* =========================================================
    APARTADO DE CONEXION A BASE DE DATOS (SUPABASE)
    ========================================================= */
-
-
 const DB_HOOKS = {
   async registrarUsuario(datosUsuario) {
     const usuariosGuardados = JSON.parse(localStorage.getItem('nexolocal_usuarios') || '[]');
@@ -1082,6 +1196,10 @@ const DB_HOOKS = {
     console.log('Registrar solicitud a proveedores en Supabase:', ordenes);
   },
 
+  async registrarProveedor(proveedor) {
+    console.log('Registrar proveedor en Supabase:', proveedor);
+  },
+
   async crearPedidoCliente(pedido) {
     console.log('Crear pedido de cliente en Supabase:', pedido);
   },
@@ -1105,7 +1223,7 @@ const MAP_HOOKS = {
     if (this.mapInstance) return;
     this.mapInstance = L.map('map').setView([ubicacionUsuario.lat, ubicacionUsuario.lng], 15);
 
-L.tileLayer(
+    L.tileLayer(
       'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',
       {
         attribution: 'Tiles © Esri',
@@ -1114,7 +1232,7 @@ L.tileLayer(
         keepBuffer: 4,
         updateWhenZooming: false
       }
-).addTo(this.mapInstance);
+    ).addTo(this.mapInstance);
 
     this.mapInstance.on('click', e => {
       if (!modoPinManualActivo) return;
@@ -1188,7 +1306,6 @@ L.tileLayer(
     const radioMax = parseFloat(document.getElementById('radius-filter')?.value || '5');
     this.actualizarUbicacionUsuarioEnMapa(false);
 
-    // Se muestran todos los negocios (dentro del radio y lejos de la zona) indicando su estado de distancia
     lista.forEach(tienda => {
       const dentroDelRadio = tienda.distanciaKm <= radioMax;
       const esRec = esTiendaRecomendada(tienda);
@@ -1832,8 +1949,172 @@ function actualizarEstadoRegla(id, cumple) {
 }
 
 /* =========================================================
-   REGISTRO E INICIO DE SESION
+   REGISTRO E INICIO DE SESION + ASISTENTE DE CATEGORIA Y MAPA 500M
    ========================================================= */
+function toggleAsistenteRegistro() {
+  const panel = document.getElementById('reg-asistente-panel');
+  if (panel) panel.classList.toggle('hidden');
+}
+
+function detectarCategoriaParaNegocio(texto) {
+  const q = normalizarTextoBase(texto);
+  const reglasNegocio = [
+    { cat: 'Producción Local', keys: ['cosecha', 'huerta', 'agricola', 'miel', 'apicultor', 'grano', 'maiz', 'frijol', 'conserva', 'mermelada', 'productor', 'rancho'] },
+    { cat: 'Tiendas y Abarrotes', keys: ['abarrotes', 'tiendita', 'miscelanea', 'cremeria', 'queso', 'leche', 'refresco', 'cerveza', 'alcohol', 'botana', 'carniceria', 'carne', 'limpieza', 'despensa', 'minisuper'] },
+    { cat: 'Alimentos Preparados', keys: ['comida', 'antojitos', 'tacos', 'gorditas', 'tortilla', 'tortilleria', 'masa', 'pan', 'panaderia', 'pastel', 'postre', 'reposteria', 'cafe', 'cafeteria', 'jugos', 'aguas frescas', 'restaurante', 'cocina'] },
+    { cat: 'Insumos y Papelería', keys: ['papeleria', 'copias', 'oficina', 'empaque', 'desechable', 'merceria', 'hilo', 'tela', 'semilla', 'fertilizante agricola'] },
+    { cat: 'Ferretería y Construcción', keys: ['ferreteria', 'tornillo', 'pintura', 'plomeria', 'tubo', 'electrico', 'cable', 'construccion', 'cemento', 'arena', 'grava', 'herramienta'] },
+    { cat: 'Talleres y Oficios', keys: ['taller', 'artesania', 'carpinteria', 'madera', 'mueble', 'bordado', 'costura', 'herreria', 'soldadura', 'zapato', 'calzado', 'talabarteria'] },
+    { cat: 'Vivero y Jardinería', keys: ['vivero', 'planta', 'maceta', 'arbol', 'frutal', 'jardin', 'jardineria', 'tierra', 'abono', 'sustrato'] }
+  ];
+
+  for (const regla of reglasNegocio) {
+    if (regla.keys.some(k => q.includes(k) || coincidenciaAproximada(q, k))) {
+      const subs = CATEGORIAS_CATALOGO[regla.cat] || [];
+      const subMatch = subs.find(s => coincidenciaAproximada(q, s)) || subs[0];
+      return { categoria: regla.cat, subcategoria: subMatch };
+    }
+  }
+
+  for (const [cat, subs] of Object.entries(CATEGORIAS_CATALOGO)) {
+    if (coincidenciaAproximada(q, cat)) {
+      return { categoria: cat, subcategoria: subs[0] };
+    }
+    const subFound = subs.find(s => coincidenciaAproximada(q, s));
+    if (subFound) {
+      return { categoria: cat, subcategoria: subFound };
+    }
+  }
+
+  return null;
+}
+
+function consultarCategoriaRegistro() {
+  const input = document.getElementById('reg-asistente-input');
+  const log = document.getElementById('reg-asistente-chat-log');
+  if (!input || !log) return;
+
+  const texto = input.value.trim();
+  if (!texto) return;
+
+  const userDiv = document.createElement('div');
+  userDiv.className = 'msg msg-user';
+  userDiv.style.padding = '0.45rem 0.65rem';
+  userDiv.style.fontSize = '0.78rem';
+  userDiv.textContent = texto;
+  log.appendChild(userDiv);
+  input.value = '';
+
+  const resultado = detectarCategoriaParaNegocio(texto);
+  const botDiv = document.createElement('div');
+  botDiv.className = 'msg msg-bot';
+  botDiv.style.padding = '0.45rem 0.65rem';
+  botDiv.style.fontSize = '0.78rem';
+
+  if (resultado) {
+    const selGiro = document.getElementById('reg-giro');
+    if (selGiro) selGiro.value = resultado.categoria;
+    botDiv.innerHTML = `Por lo que ofreces, tu negocio entra en <strong>${resultado.categoria}</strong> (subcategoría sugerida: <em>${resultado.subcategoria}</em>). Ya seleccioné esta categoría por ti.`;
+  } else {
+    botDiv.textContent = 'No identifiqué un giro exacto con esas palabras. Si vendes despensa o productos variados elige "Tiendas y Abarrotes"; si lo cultivas o elaboras tú mismo elige "Producción Local" o "Alimentos Preparados".';
+  }
+
+  log.appendChild(botDiv);
+  log.scrollTop = log.scrollHeight;
+}
+
+function activarUbicacionRegistroVendedor() {
+  const statusEl = document.getElementById('reg-ubicacion-status');
+  const radiusMsgEl = document.getElementById('reg-geo-radius-msg');
+  const mapWrap = document.getElementById('reg-seller-map-wrap');
+  const latInput = document.getElementById('reg-lat');
+  const lngInput = document.getElementById('reg-lng');
+
+  if (!('geolocation' in navigator)) {
+    if (statusEl) statusEl.textContent = 'Tu navegador no soporta geolocalización.';
+    return;
+  }
+
+  if (statusEl) statusEl.textContent = 'Obteniendo tu ubicación GPS...';
+
+  navigator.geolocation.getCurrentPosition(
+    pos => {
+      const lat = pos.coords.latitude;
+      const lng = pos.coords.longitude;
+      ubicacionRegistroGPS = { lat, lng };
+      ubicacionRegistroTienda = { lat, lng };
+      if (latInput) latInput.value = String(lat);
+      if (lngInput) lngInput.value = String(lng);
+
+      if (mapWrap) mapWrap.classList.remove('hidden');
+      if (statusEl) {
+        statusEl.textContent = `Ubicación activada (${lat.toFixed(5)}, ${lng.toFixed(5)}).`;
+      }
+
+      setTimeout(() => {
+        if (!mapaRegistroVendedor) {
+          mapaRegistroVendedor = L.map('reg-seller-map').setView([lat, lng], 16);
+          L.tileLayer(
+            'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',
+            { attribution: 'Tiles © Esri', maxZoom: 19 }
+          ).addTo(mapaRegistroVendedor);
+
+          circuloRegistro500m = L.circle([lat, lng], {
+            radius: 500,
+            color: '#2D6A4F',
+            weight: 2,
+            fillColor: '#2D6A4F',
+            fillOpacity: 0.12
+          }).addTo(mapaRegistroVendedor);
+
+          marcadorRegistroVendedor = L.marker([lat, lng], { draggable: true })
+            .addTo(mapaRegistroVendedor)
+            .bindPopup('Ubicación exacta de tu negocio')
+            .openPopup();
+
+          const validarPunto500m = (nuevaLat, nuevaLng) => {
+            const distKm = calcularDistanciaKm(ubicacionRegistroGPS.lat, ubicacionRegistroGPS.lng, nuevaLat, nuevaLng);
+            if (distKm > 0.5) {
+              marcadorRegistroVendedor.setLatLng([ubicacionRegistroTienda.lat, ubicacionRegistroTienda.lng]);
+              if (radiusMsgEl) {
+                radiusMsgEl.textContent = 'Fuera de rango: solo puedes ubicar tu tienda dentro de un radio máximo de 500 m de tu ubicación actual.';
+              }
+              return;
+            }
+            ubicacionRegistroTienda = { lat: nuevaLat, lng: nuevaLng };
+            if (latInput) latInput.value = String(nuevaLat);
+            if (lngInput) lngInput.value = String(nuevaLng);
+            marcadorRegistroVendedor.setLatLng([nuevaLat, nuevaLng]);
+            if (radiusMsgEl) {
+              radiusMsgEl.textContent = `Punto exacto guardado (${nuevaLat.toFixed(5)}, ${nuevaLng.toFixed(5)}) · a ${Math.round(distKm * 1000)} m de tu GPS.`;
+            }
+          };
+
+          marcadorRegistroVendedor.on('dragend', e => {
+            const p = e.target.getLatLng();
+            validarPunto500m(p.lat, p.lng);
+          });
+
+          mapaRegistroVendedor.on('click', e => {
+            validarPunto500m(e.latlng.lat, e.latlng.lng);
+          });
+        } else {
+          mapaRegistroVendedor.invalidateSize();
+          mapaRegistroVendedor.setView([lat, lng], 16);
+          circuloRegistro500m.setLatLng([lat, lng]);
+          marcadorRegistroVendedor.setLatLng([lat, lng]);
+        }
+      }, 60);
+    },
+    () => {
+      if (statusEl) {
+        statusEl.textContent = 'No se pudo obtener el permiso de ubicación. Habilítalo en tu navegador para fijar el punto exacto de tu tienda.';
+      }
+    },
+    { enableHighAccuracy: true, timeout: 8000 }
+  );
+}
+
 function cambiarModoAuth(modo) {
   const esLogin = modo === 'login';
   document.getElementById('login-form').classList.toggle('hidden', !esLogin);
@@ -1873,13 +2154,22 @@ async function procesarRegistro(event) {
     return;
   }
 
+  if (rolRegistro === 'vendedor' && !ubicacionRegistroTienda) {
+    errorBox.textContent = 'Activa tu ubicación y fija el punto exacto de tu tienda (dentro del radio de 500 m) antes de registrarte.';
+    errorBox.classList.remove('hidden');
+    return;
+  }
+
   const datos = {
     nombre: document.getElementById('reg-nombre').value.trim(),
     contacto: document.getElementById('reg-contacto').value.trim(),
     password,
     rol: rolRegistro,
     giro: rolRegistro === 'vendedor' ? document.getElementById('reg-giro').value : null,
-    whatsapp: rolRegistro === 'vendedor' ? document.getElementById('reg-whatsapp').value.trim() : null
+    whatsapp: rolRegistro === 'vendedor' ? document.getElementById('reg-whatsapp').value.trim() : null,
+    queVende: rolRegistro === 'vendedor' ? (document.getElementById('reg-que-vende')?.value.trim() || null) : null,
+    lat: rolRegistro === 'vendedor' ? ubicacionRegistroTienda.lat : null,
+    lng: rolRegistro === 'vendedor' ? ubicacionRegistroTienda.lng : null
   };
 
   const { data, error } = await DB_HOOKS.registrarUsuario(datos);
@@ -1887,6 +2177,11 @@ async function procesarRegistro(event) {
     errorBox.textContent = error;
     errorBox.classList.remove('hidden');
     return;
+  }
+
+  if (rolRegistro === 'vendedor' && tiendasRegistradas[0] && ubicacionRegistroTienda) {
+    tiendasRegistradas[0].categoria = datos.giro || tiendasRegistradas[0].categoria;
+    tiendasRegistradas[0].coords = [ubicacionRegistroTienda.lat, ubicacionRegistroTienda.lng];
   }
 
   usuarioActual = data;
@@ -1945,6 +2240,10 @@ function aplicarSesion() {
     document.getElementById('seller-business-name').textContent = usuarioActual.nombre;
     if (tiendasRegistradas[0]) {
       tiendasRegistradas[0].nombre = usuarioActual.nombre;
+      if (usuarioActual.giro) tiendasRegistradas[0].categoria = usuarioActual.giro;
+      if (usuarioActual.lat && usuarioActual.lng) {
+        tiendasRegistradas[0].coords = [usuarioActual.lat, usuarioActual.lng];
+      }
     }
     actualizarBadgeVerificacion(Boolean(usuarioActual.verificado));
     actualizarEstadoPromocionVendedor();
@@ -1959,6 +2258,7 @@ function aplicarSesion() {
     badge.textContent = 'Comprador';
     btnSwitch.querySelector('span').textContent = 'Cambiar a Negocio';
     actualizarBadgesCarrito();
+    aplicarEstadoBarraCategorias();
     setTimeout(() => {
       MAP_HOOKS.inicializar();
       MAP_HOOKS.renderizarMarcadores(tiendasRegistradas);
@@ -2040,7 +2340,7 @@ function renderizarSubcategoriasComprador(categoria) {
 
   const subs = CATEGORIAS_CATALOGO[categoria];
   contenedor.innerHTML = `<button class="subchip active" data-sub="todas">Todas</button>` +
-    subs.map(s => `<button class="subchip" data-sub="${s}">${s}</button>`).join('');
+    subs.map((s, idx) => `<button class="subchip chip-animate" style="animation-delay:${idx * 28}ms" data-sub="${s}">${s}</button>`).join('');
 
   contenedor.querySelectorAll('.subchip').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -2082,7 +2382,7 @@ function renderizarInventario() {
         <span class="unit-pill">${unidad}</span>
         <small class="hint" style="display:block;">Meta ${usaMetaTemporada ? 'Temp. Alta' : 'mínima'}: ${metaMinima} ${unidad}</small>
       </td>
-      <td>
+      <td style="white-space:nowrap;">
         <span class="${esCritico ? 'badge-danger' : 'badge-ok'}">
           ${esCritico ? (usaMetaTemporada ? 'Bajo meta temporada' : 'Stock crítico') : 'En existencia'}
         </span>
@@ -2249,7 +2549,7 @@ function renderizarPeticionesCategorias() {
 }
 
 /* =========================================================
-   FICHA DE NEGOCIO Y CALIFICACION CON ESTRELLAS
+   FICHA DE NEGOCIO Y CALIFICACION CON ESTRELLAS (+ STEPPER - / + EN TIENDA)
    ========================================================= */
 function seleccionarEstrella(valor) {
   estrellaSeleccionada = valor;
@@ -2271,6 +2571,32 @@ function seleccionarEstrella(valor) {
 function abrirDetalleTiendaPorId(tiendaId) {
   const tienda = tiendasRegistradas.find(t => t.id === tiendaId) || tiendasRegistradas[0];
   abrirDetalleTienda(tienda);
+}
+
+function ajustarCantidadTienda(prodKey, delta, maxStock, unidad) {
+  const input = document.getElementById(`store-qty-${prodKey}`);
+  if (!input || maxStock <= 0) return;
+
+  normalizarCantidadInput(input, unidad);
+  const actual = esUnidadContinua(unidad) ? parseFloat(input.value) : parseInt(input.value, 10);
+  const siguiente = Math.round((actual + delta) * 100) / 100;
+
+  if (siguiente < 1) {
+    input.value = '1';
+    return;
+  }
+
+  if (siguiente > maxStock) {
+    input.value = String(maxStock);
+    const fbStore = document.getElementById('store-cart-feedback');
+    if (fbStore) {
+      fbStore.textContent = `Stock máximo disponible: ${maxStock} ${unidad}.`;
+      fbStore.classList.remove('hidden', 'ok');
+    }
+    return;
+  }
+
+  input.value = String(siguiente);
 }
 
 function renderizarFichaTienda(tienda = null) {
@@ -2321,25 +2647,42 @@ function renderizarFichaTienda(tienda = null) {
           <span>${p.categoria} · ${p.subcategoria}</span>
           <span class="store-prod-price">$${Number(p.precio).toFixed(2)} / ${p.unidad} · ${disponible ? `Stock: ${stockNum} ${p.unidad}` : 'Agotado'}</span>
           <div class="store-prod-actions">
-            <input
-              type="text"
-              inputmode="decimal"
-              id="store-qty-${prodKey}"
-              class="store-prod-qty"
-              value="1"
-              ${disponible ? '' : 'disabled'}
-              aria-label="Cantidad de ${p.nombre}"
-              oninput="validarInputSegunUnidad(this, '${p.unidad}')"
-              onblur="normalizarCantidadInput(this, '${p.unidad}')"
-            />
+            <div class="store-qty-stepper">
+              <button
+                type="button"
+                class="btn-step-qty"
+                ${disponible ? '' : 'disabled'}
+                onclick="ajustarCantidadTienda('${prodKey}', -1, ${stockNum}, '${p.unidad}')"
+                title="Restar 1"
+              >-</button>
+              <input
+                type="text"
+                inputmode="decimal"
+                id="store-qty-${prodKey}"
+                class="store-prod-qty"
+                value="1"
+                ${disponible ? '' : 'disabled'}
+                aria-label="Cantidad de ${p.nombre}"
+                oninput="validarInputSegunUnidad(this, '${p.unidad}')"
+                onblur="normalizarCantidadInput(this, '${p.unidad}')"
+              />
+              <button
+                type="button"
+                class="btn-step-qty"
+                ${disponible ? '' : 'disabled'}
+                onclick="ajustarCantidadTienda('${prodKey}', 1, ${stockNum}, '${p.unidad}')"
+                title="Sumar 1"
+              >+</button>
+            </div>
             <button
               type="button"
               class="btn-add-cart"
+              style="color:#ffffff;"
               ${disponible ? '' : 'disabled'}
               onclick="agregarAlCarrito('${activa.id}', '${prodKey}', ${idx})"
             >
               <i data-lucide="shopping-cart"></i>
-              <span>${disponible ? 'Agregar' : 'Sin stock'}</span>
+              <span style="color:#ffffff;">${disponible ? 'Agregar' : 'Sin stock'}</span>
             </button>
           </div>
         </div>
@@ -2652,21 +2995,129 @@ function agregarBurbuja(contenedorId, texto, tipo) {
 }
 
 /* =========================================================
-   NAVEGACION GENERAL Y MODALES
+   DESPLIEGUE ANIMADO DE CATEGORIAS ("TODOS") Y ATAJOS TECLADO
    ========================================================= */
-document.querySelectorAll('#category-filters .chip').forEach(chip => {
+function aplicarEstadoBarraCategorias() {
+  const contenedor = document.getElementById('category-filters');
+  const iconToggle = document.getElementById('icon-toggle-categorias');
+  if (contenedor) {
+    contenedor.classList.toggle('collapsed', !categoriasBarraExpandidas);
+    contenedor.classList.toggle('expanded', categoriasBarraExpandidas);
+  }
+  if (iconToggle) {
+    iconToggle.style.transition = 'transform 0.28s cubic-bezier(0.22, 1, 0.36, 1)';
+    iconToggle.style.transform = categoriasBarraExpandidas ? 'rotate(180deg)' : 'rotate(0deg)';
+  }
+
+  document.querySelectorAll('#category-filters .cat-extra').forEach((chip, idx) => {
+    if (categoriasBarraExpandidas) {
+      chip.classList.remove('hidden');
+      chip.style.animationDelay = `${idx * 32}ms`;
+      chip.classList.remove('chip-cascade-in');
+      void chip.offsetWidth;
+      chip.classList.add('chip-cascade-in');
+    } else {
+      chip.classList.add('hidden');
+      chip.classList.remove('chip-cascade-in');
+    }
+  });
+}
+
+function toggleDesplegarCategorias(btnTodos) {
+  categoriasBarraExpandidas = !categoriasBarraExpandidas;
+  aplicarEstadoBarraCategorias();
+
+  document.querySelectorAll('#category-filters .chip').forEach(c => c.classList.remove('active'));
+  if (btnTodos) btnTodos.classList.add('active');
+
+  renderizarSubcategoriasComprador('todos');
+  MAP_HOOKS.filtrarPorCategoria('todos', 'todas');
+}
+
+document.querySelectorAll('#category-filters .cat-extra').forEach(chip => {
   chip.addEventListener('click', () => {
+    const cat = chip.dataset.cat;
+    categoriasBarraExpandidas = true;
+    aplicarEstadoBarraCategorias();
     document.querySelectorAll('#category-filters .chip').forEach(c => c.classList.remove('active'));
     chip.classList.add('active');
-    const cat = chip.dataset.cat;
     renderizarSubcategoriasComprador(cat);
     MAP_HOOKS.filtrarPorCategoria(cat, 'todas');
   });
 });
 
+// Atajos de teclado: Escape para cerrar modales/paneles y Enter para confirmar acción
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    const dropdown = document.getElementById('search-history-dropdown');
+    if (dropdown && !dropdown.classList.contains('hidden')) {
+      ocultarHistorialBusquedas();
+      return;
+    }
+
+    const drawer = document.getElementById('stores-drawer');
+    if (drawer && drawer.classList.contains('open')) {
+      cerrarDrawerTiendas();
+      return;
+    }
+
+    const modalesOrden = [
+      'modal-nuevo-proveedor',
+      'modal-modificar-temporada',
+      'modal-solicitar-categoria',
+      'modal-promocion',
+      'modal-verificacion',
+      'modal-nuevo-producto',
+      'modal-carrito',
+      'modal-tienda'
+    ];
+
+    for (const idModal of modalesOrden) {
+      const modalEl = document.getElementById(idModal);
+      if (modalEl && !modalEl.classList.contains('hidden')) {
+        cerrarModal(idModal);
+        return;
+      }
+    }
+  }
+
+  if (e.key === 'Enter') {
+    const tag = (e.target?.tagName || '').toUpperCase();
+    if (tag === 'TEXTAREA' || e.target?.closest('form')) return;
+
+    const modalCarrito = document.getElementById('modal-carrito');
+    const panelCarrito = document.getElementById('panel-carrito-compra');
+    const btnConfirmar = document.getElementById('btn-confirmar-carrito');
+    if (
+      modalCarrito &&
+      !modalCarrito.classList.contains('hidden') &&
+      panelCarrito &&
+      !panelCarrito.classList.contains('hidden') &&
+      btnConfirmar &&
+      !btnConfirmar.disabled
+    ) {
+      e.preventDefault();
+      confirmarPedidoCarrito();
+      return;
+    }
+
+    const modalTemp = document.getElementById('modal-modificar-temporada');
+    if (modalTemp && !modalTemp.classList.contains('hidden') && e.target?.id !== 'buscar-producto-temporada-modal') {
+      e.preventDefault();
+      cerrarModal('modal-modificar-temporada');
+    }
+  }
+});
+
 function cambiarTabVendedor(tabId, boton) {
   document.querySelectorAll('.seller-tab-content').forEach(sec => sec.classList.add('hidden'));
-  document.getElementById(`tab-${tabId}`).classList.remove('hidden');
+  const target = document.getElementById(`tab-${tabId}`);
+  if (target) {
+    target.classList.remove('hidden');
+    target.classList.remove('tab-fade-in');
+    void target.offsetWidth;
+    target.classList.add('tab-fade-in');
+  }
   document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
   boton.classList.add('active');
 
@@ -2696,11 +3147,12 @@ function abrirModalNuevoProducto() {
 }
 
 function cerrarModal(id) {
-  document.getElementById(id).classList.add('hidden');
+  const el = document.getElementById(id);
+  if (el) el.classList.add('hidden');
 }
 
 /* ==========================================================================
-   IMPLEMENTACION NUEVA: CARRITO TIPO MERCADO LIBRE, PAGO Y FLUJO DE DESPACHO
+   CARRITO TIPO MERCADO LIBRE, PAGO Y FLUJO DE DESPACHO
    ========================================================================== */
 function guardarCarritoLocal() {
   localStorage.setItem('nexolocal_carrito', JSON.stringify(carritoCompras));
@@ -2725,16 +3177,29 @@ function obtenerProductoActualizado(tiendaId, productoId, nombreFallback) {
   );
 }
 
-function actualizarBadgesCarrito() {
+function animarBumpBadge(el) {
+  if (!el) return;
+  el.classList.remove('badge-bump');
+  void el.offsetWidth;
+  el.classList.add('badge-bump');
+}
+
+function actualizarBadgesCarrito(animar = false) {
   const totalItems = carritoCompras.length;
   const activosComprador = pedidosClientes.filter(p => p.estado !== 'entregado').length;
   const activosVendedor = pedidosClientes.filter(p => p.estado !== 'entregado').length;
 
   const badgeNav = document.getElementById('cart-count-badge');
-  if (badgeNav) badgeNav.textContent = totalItems;
+  if (badgeNav) {
+    badgeNav.textContent = totalItems;
+    if (animar) animarBumpBadge(badgeNav);
+  }
 
   const badgeModalTienda = document.getElementById('modal-tienda-cart-count');
-  if (badgeModalTienda) badgeModalTienda.textContent = totalItems;
+  if (badgeModalTienda) {
+    badgeModalTienda.textContent = totalItems;
+    if (animar) animarBumpBadge(badgeModalTienda.parentElement);
+  }
 
   const badgeTabCart = document.getElementById('tab-cart-count');
   if (badgeTabCart) badgeTabCart.textContent = totalItems;
@@ -2781,7 +3246,7 @@ function agregarAlCarrito(tiendaId, prodKey, idxFallback) {
 
   if (cantidadAcumulada > stockActual) {
     if (fbStore) {
-      fbStore.textContent = `Cantidad no disponible: solo quedan ${stockActual} ${producto.unidad} de "${producto.nombre}" en inventario.`;
+      fbStore.textContent = `Stock máximo alcanzado: solo quedan ${stockActual} ${producto.unidad} de "${producto.nombre}" en inventario.`;
       fbStore.classList.remove('hidden', 'ok');
     }
     return;
@@ -2802,10 +3267,12 @@ function agregarAlCarrito(tiendaId, prodKey, idxFallback) {
     });
   }
 
-  guardarCarritoLocal();
+  localStorage.setItem('nexolocal_carrito', JSON.stringify(carritoCompras));
+  actualizarBadgesCarrito(true);
 
   if (fbStore) {
-    fbStore.textContent = `Agregado al carrito: ${cantidadSolicitada} ${producto.unidad} de "${producto.nombre}". Se guarda en tu carrito sin enviarse al vendedor hasta que pagues.`;
+    const avisoMax = (existente ? existente.cantidad : cantidadSolicitada) >= stockActual ? ' (Stock máximo en carrito)' : '';
+    fbStore.textContent = `Agregado al carrito: ${cantidadSolicitada} ${producto.unidad} de "${producto.nombre}"${avisoMax}. Se guarda en tu carrito sin enviarse al vendedor hasta que pagues.`;
     fbStore.classList.remove('hidden');
     fbStore.classList.add('ok');
   }
@@ -2866,6 +3333,7 @@ function renderizarCarrito() {
 
     const agotado = stockReal <= 0;
     const excedeStock = !agotado && item.cantidad > stockReal;
+    const enStockMaximo = !agotado && !excedeStock && item.cantidad >= stockReal;
     const noDisponible = agotado || excedeStock;
     if (noDisponible) hayNoDisponibles = true;
 
@@ -2877,6 +3345,8 @@ function renderizarCarrito() {
       avisoStockHtml = `<span class="cart-item-warning"><i data-lucide="alert-circle"></i> No disponible (agotado en tienda)</span>`;
     } else if (excedeStock) {
       avisoStockHtml = `<span class="cart-item-warning"><i data-lucide="alert-triangle"></i> Cantidad no disponible (solo quedan ${stockReal} ${item.unidad})</span>`;
+    } else if (enStockMaximo) {
+      avisoStockHtml = `<span class="cart-max-stock-msg">Stock máximo</span>`;
     }
 
     return `
@@ -2889,7 +3359,13 @@ function renderizarCarrito() {
         <div class="cart-item-controls">
           <button type="button" class="cart-qty-btn" onclick="modificarCantidadCarrito(${idx}, -1)" title="Disminuir">-</button>
           <span class="cart-qty-val">${item.cantidad} ${item.unidad}</span>
-          <button type="button" class="cart-qty-btn" onclick="modificarCantidadCarrito(${idx}, 1)" title="Aumentar">+</button>
+          <button
+            type="button"
+            class="cart-qty-btn"
+            ${enStockMaximo || agotado ? 'disabled' : ''}
+            onclick="modificarCantidadCarrito(${idx}, 1)"
+            title="${enStockMaximo ? 'Stock máximo' : 'Aumentar'}"
+          >+</button>
           <button type="button" class="btn-remove-cart-item" onclick="eliminarItemCarrito(${idx})" title="Quitar del carrito">
             <i data-lucide="trash-2"></i>
           </button>
@@ -2933,7 +3409,7 @@ function modificarCantidadCarrito(index, delta) {
     return;
   }
 
-  if (delta > 0 && stockReal > 0 && nuevaCant > stockReal) {
+  if (delta > 0 && stockReal > 0 && nuevaCant >= stockReal) {
     item.cantidad = stockReal;
   } else {
     item.cantidad = nuevaCant;
@@ -2965,7 +3441,6 @@ async function confirmarPedidoCarrito() {
 
   if (carritoCompras.length === 0) return;
 
-  // Verificar nuevamente stock en vivo antes de generar el pedido al vendedor
   for (const item of carritoCompras) {
     const prodReal = obtenerProductoActualizado(item.tiendaId, item.prodKey, item.nombre);
     const stockReal = prodReal ? Number(prodReal.stock) : 0;
@@ -2987,7 +3462,6 @@ async function confirmarPedidoCarrito() {
     }
   }
 
-  // Agrupar por tienda para enviar cada pedido al vendedor correspondiente
   const porTienda = {};
   carritoCompras.forEach(item => {
     if (!porTienda[item.tiendaId]) {
@@ -3006,7 +3480,6 @@ async function confirmarPedidoCarrito() {
   const nombreComprador = usuarioActual?.nombre || 'Comprador Local';
 
   for (const grupo of Object.values(porTienda)) {
-    // Descontar existencias reales de cada producto comprado
     grupo.items.forEach(it => {
       const prodReal = obtenerProductoActualizado(it.tiendaId, it.prodKey, it.nombre);
       if (prodReal) {
@@ -3031,7 +3504,7 @@ async function confirmarPedidoCarrito() {
       total: Math.round(grupo.total * 100) / 100,
       metodoPago: metodoPagoSeleccionado === 'online' ? 'Pagado en línea' : 'Pagar en tienda al recoger',
       pagadoOnline: metodoPagoSeleccionado === 'online',
-      estado: 'pendiente', // 'pendiente' -> 'despachando' -> 'listo' -> 'entregado'
+      estado: 'pendiente',
       horaCreacion: hora,
       horaActualizacion: hora
     };
@@ -3210,9 +3683,11 @@ window.addEventListener('storage', e => {
   }
 });
 
-// Inicializar selects por defecto, solicitar permiso de ubicación al entrar y restaurar sesión
+// Inicializar selects por defecto, barra de categorías, solicitar ubicación y restaurar sesión
 poblarSelectCategorias('prod-categoria');
+poblarSelectCategorias('reg-giro');
 actualizarSubcategoriasModal('Producción Local');
+aplicarEstadoBarraCategorias();
 actualizarBadgesCarrito();
 renderizarPedidosVendedor();
 solicitarUbicacionUsuario(false);
