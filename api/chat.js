@@ -7,14 +7,21 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Método no permitido' });
   }
 
-  const apiKey = process.env.GEMINI_API_KEY;
+  const apiKey = (process.env.GEMINI_API_KEY || '').trim();
   if (!apiKey) {
     return res.status(500).json({
       accion: 'CONSULTA',
       aprobado: false,
-      razon: 'Falta configurar GEMINI_API_KEY en las variables de entorno de Vercel.',
-      mensaje_usuario: 'Falta configurar GEMINI_API_KEY en Vercel para activar el asistente.'
+      razon: 'Falta configurar GEMINI_API_KEY en Vercel.',
+      mensaje_usuario: 'Falta configurar GEMINI_API_KEY en las variables de entorno de Vercel.'
     });
+  }
+
+  let body = {};
+  try {
+    body = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body || {});
+  } catch {
+    body = {};
   }
 
   const {
@@ -24,7 +31,7 @@ export default async function handler(req, res) {
     mimeType = 'image/jpeg',
     contextoProductos = [],
     retoVerificacion = ''
-  } = req.body || {};
+  } = body;
 
   let systemInstruction = '';
   const parts = [];
@@ -38,15 +45,15 @@ Eres el Asistente de Búsqueda Inteligente de NexoLocal, una plataforma de comer
 Tu función es ayudar al comprador a encontrar productos reales en existencia, comparar cercanía y sugerir opciones útiles.
 
 REGLAS ESTRICTAS:
-1. Basa tus recomendaciones ÚNICAMENTE en el catálogo en existencia proporcionado en "CATÁLOGO DISPONIBLE". Nunca inventes tiendas, precios ni productos que no estén en la lista.
+1. Basa tus recomendaciones ÚNICAMENTE en el catálogo proporcionado en "CATÁLOGO DISPONIBLE". Nunca inventes tiendas, precios ni productos que no estén en la lista.
 2. Cuando recomiendes artículos, menciona siempre: nombre del producto, precio con unidad, stock disponible, nombre de la tienda y distancia en km.
 3. Si el comprador pide opciones cercanas, ordena priorizando los negocios con menor "distanciaKm".
 4. Si pide productores directos o sin intermediarios, prioriza los artículos de categoría "Producción Local".
-5. Si escribe con errores ortográficos, modismos (ej. "chela", "jitomate", "keso") o pide ingredientes para una receta/ocasión (ej. "para hacer salsa", "carnita asada"), relaciona inteligentemente los productos disponibles.
+5. Si escribe con errores ortográficos, modismos (ej. "chela", "jitomate", "keso") o pide ingredientes para una receta/ocasión, relaciona inteligentemente los productos disponibles.
 6. Si lo que pide no está disponible, indícalo con claridad y sugiere la alternativa más cercana del catálogo.
-7. Formato de respuesta: usa texto limpio, viñetas con "•" y saltos de línea claros. NO uses asteriscos de Markdown (**) ni etiquetas HTML. Sé breve, amable y directo (máximo 120 palabras).
+7. Formato de respuesta: usa texto limpio, viñetas con "•" y saltos de línea claros. NO uses asteriscos de Markdown (**) ni HTML. Sé breve, amable y directo (máximo 120 palabras).
 
-Debes responder SIEMPRE con este objeto JSON exacto:
+Responde SIEMPRE con este JSON exacto:
 {
   "mensaje_usuario": "Tu respuesta clara y útil para el comprador"
 }
@@ -67,7 +74,7 @@ Ayudas al vendedor/productor en tres tareas principales:
 
 TAREA A — ALTA DE PRODUCTO NUEVO (accion: "PUBLICAR"):
 - Se activa cuando el vendedor envía una FOTO de un producto nuevo o pide registrar/agregar un artículo nuevo al catálogo (ej. "Agrega 20 kg de Aguacate a $65", o adjunta foto con precio/cantidad).
-- Si envía foto sin texto, identifica el producto visible en la imagen, estima una categoría/subcategoría válida y asigna cantidad 1 (o la visible) y precio 0 si no lo indicó.
+- Si envía foto sin texto, identifica el producto visible en la imagen, estima una categoría/subcategoría válida y asigna cantidad 1 y precio 0 si no lo indicó.
 - Categorías y subcategorías válidas obligatorias:
   • "Producción Local": ["Frutas y Hortalizas", "Miel y Derivados", "Lácteos y Quesos", "Granos y Semillas", "Panadería Artesanal", "Conservas y Salsas"]
   • "Tiendas y Abarrotes": ["Despensa Básica", "Lácteos y Quesos", "Bebidas y Refrescos", "Jugos y Bebidas Naturales", "Bebidas Alcohólicas", "Botanas y Frituras", "Carnes y Embutidos", "Limpieza del Hogar", "Cuidado Personal"]
@@ -79,13 +86,12 @@ TAREA A — ALTA DE PRODUCTO NUEVO (accion: "PUBLICAR"):
 - Unidades válidas: "pz", "kg", "g", "ton", "lt", "ml", "galón", "paquete", "caja", "bolsa", "costal", "docena", "botella", "garrafón", "metro", "rollo".
 
 TAREA B — ENTRADA O SALIDA DE INVENTARIO (accion: "MOVIMIENTO"):
-- Se activa cuando el vendedor reporta compras, surtido, ventas o mermas de un producto QUE YA EXISTE en "INVENTARIO ACTUAL" (ej. "Entraron 15 kg de Tomate", "Vendí 3 litros de miel", "Salieron 4 costales de maíz").
+- Se activa cuando el vendedor reporta compras, surtido, ventas o mermas de un producto QUE YA EXISTE en "INVENTARIO ACTUAL" (ej. "Entraron 15 kg de Tomate", "Vendí 3 litros de miel").
 - Busca el artículo correspondiente en "INVENTARIO ACTUAL" y devuelve su "producto_id" exacto.
-- "tipo_movimiento" debe ser "ENTRADA" (si entró/compró/cosechó) o "SALIDA" (si vendió/salió/despachó).
+- "tipo_movimiento" debe ser "ENTRADA" o "SALIDA".
 
 TAREA C — AYUDA, ANÁLISIS Y ASESORÍA DE NEGOCIO (accion: "CONSULTA"):
-- Se activa cuando el vendedor pregunta sobre su inventario (ej. "¿Qué me falta resurtir?", "¿Cuál es mi producto más caro?"), pide consejos de precios/márgenes, o pregunta cómo usar las funciones de NexoLocal (Temporada Alta, verificación humana, promociones o proveedores).
-- Responde con recomendaciones prácticas basadas en su "INVENTARIO ACTUAL".
+- Se activa cuando el vendedor pregunta sobre su inventario, pide consejos de precios/márgenes o pregunta cómo usar NexoLocal.
 
 Formato de "mensaje_usuario": texto limpio con viñetas "•" y saltos de línea. NO uses asteriscos (**).
 
@@ -149,54 +155,57 @@ Responde ÚNICAMENTE con este JSON:
     }
   }
 
-  try {
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          systemInstruction: {
-            parts: [{ text: systemInstruction }]
-          },
-          contents: [
-            {
-              role: 'user',
-              parts
+  const modelos = ['gemini-2.5-flash', 'gemini-2.0-flash'];
+  let ultimoStatus = 500;
+  let ultimoDetalle = 'No se pudo contactar con Gemini.';
+
+  for (const modelo of modelos) {
+    try {
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${modelo}:generateContent?key=${encodeURIComponent(apiKey)}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            system_instruction: {
+              parts: [{ text: systemInstruction }]
+            },
+            contents: [
+              {
+                role: 'user',
+                parts
+              }
+            ],
+            generationConfig: {
+              temperature: 0.35,
+              responseMimeType: 'application/json'
             }
-          ],
-          generationConfig: {
-            temperature: 0.35,
-            responseMimeType: 'application/json'
-          }
-        })
+          })
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        ultimoStatus = response.status;
+        ultimoDetalle = data?.error?.message || JSON.stringify(data);
+        continue;
       }
-    );
 
-    const data = await response.json();
+      const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
+      const cleanJson = rawText.replace(/```json|```/gi, '').trim();
+      const parsed = JSON.parse(cleanJson);
 
-    if (!response.ok) {
-      console.error('Error Gemini API:', data);
-      return res.status(response.status).json({
-        accion: 'CONSULTA',
-        aprobado: false,
-        razon: data?.error?.message || 'Error al consultar Gemini.',
-        mensaje_usuario: 'El asistente tuvo un problema temporal al responder. Intenta de nuevo.'
-      });
+      return res.status(200).json(parsed);
+    } catch (error) {
+      ultimoDetalle = error.message || 'Error de red o formato JSON.';
     }
-
-    const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
-    const cleanJson = rawText.replace(/```json|```/gi, '').trim();
-    const parsed = JSON.parse(cleanJson);
-
-    return res.status(200).json(parsed);
-  } catch (error) {
-    console.error('Error interno /api/chat:', error);
-    return res.status(500).json({
-      accion: 'CONSULTA',
-      aprobado: false,
-      razon: 'Error interno al procesar la respuesta de IA.',
-      mensaje_usuario: 'No se pudo procesar la respuesta del asistente en este momento.'
-    });
   }
+
+  return res.status(ultimoStatus).json({
+    accion: 'CONSULTA',
+    aprobado: false,
+    razon: `Error Gemini (${ultimoStatus}): ${ultimoDetalle}`,
+    mensaje_usuario: `Error Gemini (${ultimoStatus}): ${ultimoDetalle}`
+  });
 }
