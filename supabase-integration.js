@@ -4,8 +4,8 @@
    No reemplaza app.js: sobreescribe DB_HOOKS y unas pocas funciones.
    ===================================================================== */
 
-const SUPABASE_URL = 'https://TU-PROYECTO.supabase.co';   // Project Settings > API
-const SUPABASE_ANON_KEY = 'TU_ANON_PUBLIC_KEY';            // la clave "anon public" (NUNCA la service_role)
+const SUPABASE_URL = 'https://sizgktvthrvijrpzqjve.supabase.co/rest/v1/';   // Project Settings > API
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNpemdrdHZ0aHJ2aWpycHpxanZlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTUxMDgzMTAsImV4cCI6MjExMDY4NDMxMH0.17iIA4CeWgpOuvZ-cKFzBTnD_N_ljTfQzstYA0_zwPY';            // la clave "anon public" (NUNCA la service_role)
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 let datosReales = false;       // true cuando las tiendas vienen de la base de datos
