@@ -89,17 +89,112 @@ const DB_HOOKS = {
    APARTADO DE CONEXION AL MAPA (LEAFLET)
    ========================================================= */
 const MAP_HOOKS = {
-  mapInstance: null,
-  inicializar() {
-    if (this.mapInstance) return;
-    this.mapInstance = L.map('map').setView([24.0298, -104.6506], 15);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; OpenStreetMap contributors'
-    }).addTo(this.mapInstance);
-  },
-  filtrarPorCategoria(categoria, subcategoria = 'todas') {
-    console.log('Filtrar marcadores por:', { categoria, subcategoria });
+ // 2. Inicializar mapa centrado en Durango
+const map = L.map('map').setView([24.0298, -104.6506], 15);
+
+// Quita el cuadro "Contenedor de Mapa Listo" y recalcula el tamaño del mapa
+document.getElementById('map-empty-state')?.remove();
+setTimeout(() => map.invalidateSize(), 300);
+
+// 3. Mapa base: solo calles, sin negocios
+L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
+  attribution: 'Tiles &copy; Esri',
+  maxNativeZoom: 16,
+  maxZoom: 19
+}).addTo(map);
+
+// Nombres de calles y colonias (borra este bloque si no los quieres)
+L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Reference/MapServer/tile/{z}/{y}/{x}', {
+  maxNativeZoom: 16,
+  maxZoom: 19
+}).addTo(map);
+
+// 4. Ícono personalizado del productor
+const iconoProductor = L.divIcon({
+  className: 'pin-custom',
+  html: '<div class="pin"><span>🌿</span></div>',
+  iconSize: [40, 48],
+  iconAnchor: [20, 48],
+  popupAnchor: [0, -44]
+});
+
+// 5. Evita que texto de la base de datos rompa el HTML del popup
+function esc(texto) {
+  return String(texto ?? '').replace(/[&<>"']/g, c => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[c]));
+}
+
+// 6. Consultar productores y sus productos
+async function cargarMapa() {
+  const { data: productores, error } = await supabaseClient
+    .from('productores')
+    .select(`
+      id,
+      nombre_negocio,
+      whatsapp,
+      historia,
+      latitud,
+      longitud,
+      productos (
+        id,
+        nombre,
+        categoria,
+        descripcion,
+        precio,
+        imagen_url
+      )
+    `);
+
+  if (error) {
+    console.error('Error al consultar Supabase:', error.message);
+    return;
   }
+
+  const marcadores = [];
+
+  // 7. Pintar cada productor en el mapa
+  productores.forEach(prod => {
+    if (prod.latitud == null || prod.longitud == null) return;
+
+    const listaProductosHTML = (prod.productos && prod.productos.length > 0)
+      ? prod.productos.map(item => `
+          <div class="producto-item">
+            ${item.imagen_url ? `<img src="${esc(item.imagen_url)}" alt="${esc(item.nombre)}" class="producto-img">` : ''}
+            ${item.categoria ? `<span class="badge-cat">${esc(item.categoria)}</span><br>` : ''}
+            <div class="producto-titulo">${esc(item.nombre)} — <span class="producto-precio">$${esc(item.precio)}</span></div>
+            ${item.descripcion ? `<p class="producto-desc">${esc(item.descripcion)}</p>` : ''}
+          </div>
+        `).join('')
+      : '<p class="producto-desc"><em>Este productor aún no tiene productos cargados.</em></p>';
+
+    const mensajeWA = encodeURIComponent(`Hola ${prod.nombre_negocio}, vi sus productos en el mapa y me gustaría hacer un pedido.`);
+    const telefono = String(prod.whatsapp ?? '').replace(/\D/g, '');
+
+    const popupHTML = `
+      <div class="popup-card">
+        <h3>${esc(prod.nombre_negocio)}</h3>
+        ${prod.historia ? `<p class="popup-historia">${esc(prod.historia)}</p>` : ''}
+        ${listaProductosHTML}
+        <a href="https://wa.me/${telefono}?text=${mensajeWA}" target="_blank" rel="noopener" class="btn-wa">
+          Pedir por WhatsApp
+        </a>
+      </div>
+    `;
+
+    const marker = L.marker([prod.latitud, prod.longitud], { icon: iconoProductor })
+      .addTo(map)
+      .bindPopup(popupHTML, { maxWidth: 280 });
+    marcadores.push(marker);
+  });
+
+  // 8. Ajustar el mapa para que se vean todos los pines
+  if (marcadores.length > 0) {
+    map.fitBounds(L.featureGroup(marcadores).getBounds().pad(0.2), { maxZoom: 16 });
+  }
+}
+
+cargarMapa();
 };
 
 /* =========================================================
