@@ -767,31 +767,51 @@ const MAP_HOOKS = {
   // CONTROLES DE INTERFAZ
   // =======================================================
 
-  configurarControles() {
+  
+configurarControles() {
 
+    // BUSCADOR
     const buscador = document.getElementById('map-search');
 
-    if (buscador) {
+    buscador?.addEventListener('input', e => {
+      this.buscar(e.target.value);
+    });
 
-      buscador.addEventListener('input', e => {
-        this.buscar(e.target.value);
-      });
-
-    }
-
+    // FILTRO POR RADIO
     const radio = document.getElementById('map-radius');
 
-    if (radio) {
+    radio?.addEventListener('change', e => {
+      this.radioActual = Number(e.target.value);
+      this.aplicarFiltros();
+    });
 
-      radio.addEventListener('change', e => {
+    // UBICACIÓN GPS
+    const gps = document.getElementById('map-my-location');
 
-        this.radioActual = Number(e.target.value);
+    gps?.addEventListener('click', () => {
+      this.localizarUsuario();
+    });
 
-        this.aplicarFiltros();
+    // FILTROS POR CATEGORÍA
+    document.querySelectorAll('[data-cat]').forEach(boton => {
+
+      boton.addEventListener('click', () => {
+
+        this.filtrarPorCategoria(boton.dataset.cat);
+
+        // Marcar visualmente el botón seleccionado
+        document.querySelectorAll('[data-cat]').forEach(b => {
+          b.classList.remove('active');
+        });
+
+        boton.classList.add('active');
 
       });
 
-    }
+    });
+
+},
+
 
     const gps = document.getElementById('map-my-location');
 
