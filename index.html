@@ -37,7 +37,12 @@
         </div>
         <div class="input-group">
           <label for="login-password">Contraseña</label>
-          <input type="password" id="login-password" maxlength="10" placeholder="Ingresa tu contraseña" required />
+          <div class="password-wrapper">
+            <input type="password" id="login-password" maxlength="10" placeholder="Ingresa tu contraseña" required />
+            <button type="button" class="btn-toggle-pass" onclick="togglePasswordVisibility('login-password', this)" aria-label="Mostrar u ocultar contraseña">
+              <i data-lucide="eye"></i>
+            </button>
+          </div>
         </div>
         <p id="auth-error-msg" class="auth-error hidden"></p>
         <button type="submit" class="btn-primary btn-full">
@@ -73,8 +78,11 @@
               <select id="reg-giro" class="select-field">
                 <option value="Producción Local">Producción Local</option>
                 <option value="Tiendas y Abarrotes">Tiendas y Abarrotes</option>
+                <option value="Alimentos Preparados">Alimentos Preparados</option>
                 <option value="Insumos y Papelería">Insumos y Papelería</option>
+                <option value="Ferretería y Construcción">Ferretería y Construcción</option>
                 <option value="Talleres y Oficios">Talleres y Oficios</option>
+                <option value="Vivero y Jardinería">Vivero y Jardinería</option>
               </select>
             </div>
             <div class="input-group">
@@ -91,15 +99,20 @@
 
         <div class="input-group">
           <label for="reg-password">Crea una contraseña (8 a 10 caracteres)</label>
-          <input
-            type="password"
-            id="reg-password"
-            minlength="8"
-            maxlength="10"
-            oninput="validarPasswordEnVivo(this.value)"
-            placeholder="Ej. Nexo#2026"
-            required
-          />
+          <div class="password-wrapper">
+            <input
+              type="password"
+              id="reg-password"
+              minlength="8"
+              maxlength="10"
+              oninput="validarPasswordEnVivo(this.value)"
+              placeholder="Ej. Nexo#2026"
+              required
+            />
+            <button type="button" class="btn-toggle-pass" onclick="togglePasswordVisibility('reg-password', this)" aria-label="Mostrar u ocultar contraseña">
+              <i data-lucide="eye"></i>
+            </button>
+          </div>
           <div class="password-rules" id="password-rules">
             <span id="rule-len" class="rule-item"><i data-lucide="circle"></i> 8 a 10 caracteres</span>
             <span id="rule-num" class="rule-item"><i data-lucide="circle"></i> Al menos 1 número</span>
@@ -135,6 +148,20 @@
     </div>
 
     <div class="nav-right">
+      <!-- BOTON DE CARRITO Y PEDIDOS DEL COMPRADOR -->
+      <button type="button" id="btn-carrito-nav" class="cart-nav-btn" onclick="abrirModalCarrito('carrito')" title="Ver mi carrito y estado de pedidos">
+        <i data-lucide="shopping-cart"></i>
+        <span>Carrito</span>
+        <span id="cart-count-badge" class="cart-badge">0</span>
+        <span id="active-orders-indicator" class="order-live-badge hidden">0</span>
+      </button>
+
+      <!-- PILDORA DE ESTADO DE GEOLOCALIZACION -->
+      <button type="button" id="geo-status-pill" class="geo-pill" onclick="solicitarUbicacionUsuario(true)" title="Actualizar o permitir ubicación GPS">
+        <i data-lucide="navigation"></i>
+        <span id="geo-status-text">Ubicando...</span>
+      </button>
+
       <button id="btn-switch-role" class="btn-ghost" onclick="alternarVistaRapida()">
         <i data-lucide="repeat"></i>
         <span>Cambiar a Negocio</span>
@@ -148,6 +175,55 @@
     </div>
   </header>
 
+  <!-- PANEL DESPLEGABLE IZQUIERDO (3 LINEAS): DIRECTORIO Y FILTROS DE TIENDAS -->
+  <div id="drawer-backdrop" class="drawer-backdrop hidden" onclick="cerrarDrawerTiendas()"></div>
+  <aside id="stores-drawer" class="stores-drawer" aria-hidden="true">
+    <div class="drawer-header">
+      <div>
+        <h2>Directorio de Negocios</h2>
+        <p>Explora tiendas registradas, recomendados y cercanía</p>
+      </div>
+      <button type="button" class="btn-close" onclick="cerrarDrawerTiendas()" aria-label="Cerrar directorio">
+        <i data-lucide="x"></i>
+      </button>
+    </div>
+
+    <div class="drawer-search-box">
+      <i data-lucide="search"></i>
+      <input
+        type="text"
+        id="drawer-store-search"
+        placeholder="Filtrar por tienda, giro o producto (ej. keso, chela)..."
+        oninput="renderizarDirectorioTiendas()"
+      />
+    </div>
+
+    <!-- FILTROS INDISPENSABLES ("TODAS" POR DEFECTO AL ABRIR DESDE LAS 3 RAYITAS) -->
+    <div class="drawer-filters" id="drawer-filters">
+      <button type="button" class="drawer-chip active" data-filter="todos" onclick="seleccionarFiltroTienda('todos', this)">
+        <i data-lucide="store"></i> Todas
+      </button>
+      <button type="button" class="drawer-chip" data-filter="recomendados" onclick="seleccionarFiltroTienda('recomendados', this)">
+        <i data-lucide="award"></i> Recomendados
+      </button>
+      <button type="button" class="drawer-chip" data-filter="calificacion" onclick="seleccionarFiltroTienda('calificacion', this)">
+        <i data-lucide="star"></i> Mejor calificado
+      </button>
+      <button type="button" class="drawer-chip" data-filter="cerca" onclick="seleccionarFiltroTienda('cerca', this)">
+        <i data-lucide="navigation"></i> Más cerca
+      </button>
+      <button type="button" class="drawer-chip" data-filter="abierto" onclick="seleccionarFiltroTienda('abierto', this)">
+        <i data-lucide="clock"></i> Abierto ahora
+      </button>
+    </div>
+
+    <div class="drawer-results-meta">
+      <span id="drawer-count-label">Mostrando todas las tiendas registradas</span>
+    </div>
+
+    <div id="drawer-stores-list" class="drawer-stores-list"></div>
+  </aside>
+
   <!-- VISTA COMPRADOR -->
   <main id="vista-comprador" class="main-container">
     <section class="filters-bar">
@@ -155,8 +231,11 @@
         <button class="chip active" data-cat="todos"><i data-lucide="layout-grid"></i> Todos</button>
         <button class="chip" data-cat="Producción Local"><i data-lucide="sprout"></i> Producción Local</button>
         <button class="chip" data-cat="Tiendas y Abarrotes"><i data-lucide="store"></i> Tiendas y Abarrotes</button>
+        <button class="chip" data-cat="Alimentos Preparados"><i data-lucide="utensils"></i> Alimentos Preparados</button>
         <button class="chip" data-cat="Insumos y Papelería"><i data-lucide="package"></i> Insumos y Papelería</button>
+        <button class="chip" data-cat="Ferretería y Construcción"><i data-lucide="wrench"></i> Ferretería</button>
         <button class="chip" data-cat="Talleres y Oficios"><i data-lucide="hammer"></i> Talleres y Oficios</button>
+        <button class="chip" data-cat="Vivero y Jardinería"><i data-lucide="flower-2"></i> Vivero</button>
       </div>
       <div class="live-indicator">
         <span class="pulse-dot"></span>
@@ -173,26 +252,89 @@
     <div class="comprador-grid">
       <section class="map-wrapper card-surface">
         <div class="map-floating-header">
-          <div class="search-box">
-            <i data-lucide="search"></i>
-            <input type="text" id="map-search" placeholder="Buscar productos, insumos o negocios cercanos..." />
+          <!-- BOTON DE TRES RAYITAS: ABRE EN "TODAS" POR DEFECTO -->
+          <button
+            type="button"
+            class="btn-drawer-trigger"
+            onclick="abrirDrawerTiendas('todos')"
+            title="Abrir directorio de todas las tiendas"
+            aria-label="Abrir directorio de todas las tiendas"
+          >
+            <i data-lucide="menu"></i>
+          </button>
+
+          <!-- BUSCADOR CON HISTORIAL Y CORRECCION FONETICA / ORTOGRAFICA -->
+          <div class="search-container" id="search-container">
+            <form class="search-box" onsubmit="ejecutarBusquedaMapa(event)">
+              <i data-lucide="search"></i>
+              <input
+                type="text"
+                id="map-search"
+                placeholder="Buscar producto, subcategoría o tienda (ej. keso, bebidas alcohólicas)..."
+                autocomplete="off"
+                onfocus="mostrarHistorialBusquedas()"
+                oninput="filtrarSugerenciasBusqueda(this.value)"
+              />
+              <button type="submit" class="btn-search-submit" title="Buscar">Ir</button>
+            </form>
+
+            <!-- DROPDOWN DE HISTORIAL Y SUGERENCIAS INTELIGENTES -->
+            <div id="search-history-dropdown" class="search-dropdown hidden">
+              <div class="search-dropdown-header">
+                <span><i data-lucide="history" class="icon-sm"></i> Búsquedas recientes y sugerencias</span>
+                <button type="button" onclick="limpiarHistorialBusquedas()">Limpiar</button>
+              </div>
+              <div id="search-history-list" class="search-history-list"></div>
+            </div>
           </div>
-          <select id="radius-filter" class="radius-select">
+
+          <select id="radius-filter" class="radius-select" onchange="aplicarFiltroRadio()">
             <option value="2">Radio 2 km</option>
             <option value="5" selected>Radio 5 km</option>
             <option value="15">Toda la zona</option>
           </select>
         </div>
 
-        <div id="map" class="map-canvas">
-          <div id="map-empty-state" class="map-placeholder">
-            <div class="placeholder-icon"><i data-lucide="map-pin"></i></div>
-            <h3>Contenedor de Mapa Listo</h3>
-            <p>Conecta la instancia de Leaflet en <code>MAP_HOOKS</code> para mostrar los negocios registrados en la base de datos.</p>
-            <button class="btn-outline-dark" onclick="abrirDetalleTienda()">
-              <i data-lucide="eye"></i> Vista previa de ficha de negocio
-            </button>
+        <!-- AVISO DE PERMISO DE UBICACION / AJUSTE MANUAL -->
+        <div id="geo-permission-banner" class="geo-banner hidden">
+          <div class="geo-banner-info">
+            <i data-lucide="map-pin-off"></i>
+            <span id="geo-banner-text">Permite el acceso a tu ubicación para medir distancias y filtrar negocios dentro de tu radio.</span>
           </div>
+          <div class="geo-banner-actions">
+            <button type="button" class="btn-geo-action primary" onclick="solicitarUbicacionUsuario(true)">Permitir ubicación</button>
+            <button type="button" class="btn-geo-action" id="btn-pin-manual" onclick="activarModoPinManual()">Marcar en mapa</button>
+          </div>
+        </div>
+
+        <!-- PILDORA DE INTERPRETACION Y RESULTADOS DE BUSQUEDA ACTIVA -->
+        <div id="map-search-status" class="map-search-status hidden">
+          <span id="map-search-status-text"></span>
+          <button type="button" onclick="limpiarFiltroBusquedaMapa()" title="Mostrar todas las tiendas">
+            <i data-lucide="x"></i>
+          </button>
+        </div>
+
+        <div id="map" class="map-canvas"></div>
+
+        <!-- ACCESOS RAPIDOS INFERIORES DEL MAPA -->
+        <div class="map-floating-footer">
+          <button type="button" class="btn-store-preview" onclick="abrirDrawerTiendas('recomendados')">
+            <i data-lucide="award"></i>
+            <span>Recomendados</span>
+          </button>
+          <button type="button" class="btn-store-preview secondary" onclick="abrirDetalleTienda()">
+            <i data-lucide="star"></i>
+            <span>Ver ficha y calificar</span>
+          </button>
+          <button type="button" class="btn-store-preview secondary" onclick="abrirModalCarrito('pedidos')">
+            <i data-lucide="package-check"></i>
+            <span>Mis Pedidos</span>
+          </button>
+          <button type="button" class="btn-store-preview secondary" onclick="centrarEnUbicacionUsuario()" title="Centrar en mi ubicación">
+            <i data-lucide="locate-fixed"></i>
+            <span>Mi ubicación</span>
+          </button>
         </div>
       </section>
 
@@ -239,14 +381,31 @@
           <span id="seller-verify-badge" class="status-unverified">
             <i data-lucide="shield-alert"></i> Verificación pendiente
           </span>
+          <span id="seller-rating-pill" class="rating-pill-hero">
+            <i data-lucide="star"></i> <span id="hero-rating-val">4.8</span>
+          </span>
+          <span id="seller-promo-badge" class="promo-badge-hero hidden">
+            <i data-lucide="award"></i> <span id="seller-promo-text">En Recomendados</span>
+          </span>
+          <span id="seller-season-badge" class="season-badge-hero hidden">
+            <i data-lucide="calendar-range"></i> <span>Temporada Alta Activa</span>
+          </span>
         </div>
-        <p>Control de inventario por cantidad, registro de entradas y salidas, y gestión de pedidos.</p>
+        <p>Control de inventario por unidad de medida, programación de stock por temporada y gestión de pedidos.</p>
       </div>
 
       <div class="seller-actions">
         <button id="btn-abrir-verificacion" class="btn-verify" onclick="abrirModalVerificacion()">
           <i data-lucide="scan-face"></i>
           <span>Validar Identidad</span>
+        </button>
+        <button type="button" class="btn-promote" onclick="abrirModalPromocion()">
+          <i data-lucide="megaphone"></i>
+          <span>Promocionar Negocio</span>
+        </button>
+        <button type="button" class="btn-ghost" onclick="abrirModalSolicitarCategoria()">
+          <i data-lucide="folder-plus"></i>
+          <span>Solicitar Categoría</span>
         </button>
         <button class="btn-primary" onclick="abrirModalNuevoProducto()">
           <i data-lucide="plus"></i>
@@ -258,6 +417,9 @@
     <div class="seller-tabs">
       <button class="tab-btn active" onclick="cambiarTabVendedor('inventario', this)">
         <i data-lucide="package"></i> Inventario y Movimientos
+      </button>
+      <button class="tab-btn" onclick="cambiarTabVendedor('temporada-alta', this)">
+        <i data-lucide="calendar-range"></i> Temporada Alta
       </button>
       <button class="tab-btn" onclick="cambiarTabVendedor('pedidos', this)">
         <i data-lucide="clipboard-list"></i> Administración de Pedidos <span id="badge-pedidos-count" class="count-pill">0</span>
@@ -272,38 +434,38 @@
       <div class="kpi-grid">
         <div class="kpi-card card-surface">
           <span>Artículos Registrados</span>
-          <strong id="kpi-total-productos">1</strong>
+          <strong id="kpi-total-productos">4</strong>
         </div>
         <div class="kpi-card card-surface kpi-warning">
-          <span>Stock Crítico (5 o menos)</span>
-          <strong id="kpi-stock-bajo">0</strong>
+          <span id="kpi-stock-bajo-label">Stock Crítico (por debajo de meta)</span>
+          <strong id="kpi-stock-bajo">1</strong>
         </div>
         <!-- RECTANGULO DIVIDIDO EN ENTRADAS Y SALIDAS -->
         <div class="kpi-card card-surface kpi-split">
           <div class="kpi-half">
             <span><i data-lucide="arrow-down-left" class="icon-sm"></i> Entradas</span>
-            <strong id="kpi-entradas" class="text-entrada">0 uds</strong>
+            <strong id="kpi-entradas" class="text-entrada">0 reg.</strong>
           </div>
           <div class="kpi-divider"></div>
           <div class="kpi-half">
             <span><i data-lucide="arrow-up-right" class="icon-sm"></i> Salidas</span>
-            <strong id="kpi-salidas" class="text-salida">0 uds</strong>
+            <strong id="kpi-salidas" class="text-salida">0 reg.</strong>
           </div>
         </div>
       </div>
 
       <div class="card-surface table-container">
         <div class="section-header">
-          <h3>Control de Existencias</h3>
-          <span class="hint">Escribe la cantidad exacta (ej. 100) y presiona Salida (-) o Entrada (+)</span>
+          <h3>Control de Existencias por Unidad de Medida</h3>
+          <span class="hint">Ingresa la cantidad según la unidad del producto (kg, lt, pz, paquete, etc.) y registra Salida o Entrada</span>
         </div>
         <table class="inventory-table">
           <thead>
             <tr>
               <th>Artículo</th>
               <th>Categoría y Subcategoría</th>
-              <th>Precio Unitario</th>
-              <th>Stock Actual</th>
+              <th>Precio por Unidad</th>
+              <th>Stock Actual / Meta</th>
               <th>Estado</th>
               <th>Registrar Salida / Entrada</th>
             </tr>
@@ -313,11 +475,68 @@
       </div>
     </section>
 
+    <!-- PROGRAMACION DE STOCK POR TEMPORADA ALTA -->
+    <section id="tab-temporada-alta" class="seller-tab-content hidden">
+      <div class="card-surface season-overview-card">
+        <div class="season-header-row">
+          <div>
+            <h3><i data-lucide="trending-up"></i> Detección Automática de Temporada Alta</h3>
+            <p class="hint">El sistema analiza el historial de salidas de tu negocio, detecta los meses pico y calcula la media de venta para sugerirte el stock necesario.</p>
+          </div>
+          <label class="season-switch-box">
+            <input type="checkbox" id="toggle-temporada-activa" onchange="alternarModoTemporadaAlta(this.checked)" />
+            <span>Aplicar metas de Temporada Alta al inventario</span>
+          </label>
+        </div>
+
+        <!-- PERIODOS DE TEMPORADA ALTA DETECTADOS -->
+        <div id="season-detected-periods" class="season-periods-grid"></div>
+      </div>
+
+      <div class="card-surface table-container">
+        <div class="section-header">
+          <div>
+            <h3>Productos Más Vendidos y Stock Programado</h3>
+            <span class="hint">Stock sugerido = Media de venta en temporada alta + 15% margen de seguridad. Puedes editar cantidades o modificar qué productos incluir.</span>
+          </div>
+          <div class="season-table-actions">
+            <button type="button" class="btn-ghost" onclick="abrirModalModificarTemporada()">
+              <i data-lucide="list-plus"></i> Modificar lista
+            </button>
+            <button type="button" class="btn-ghost" onclick="restablecerSugerenciasTemporada()">
+              <i data-lucide="rotate-ccw"></i> Restablecer media
+            </button>
+            <button type="button" class="btn-primary" onclick="guardarYGenerarResurtidoTemporada()">
+              <i data-lucide="check-circle-2"></i> Aplicar y generar lista de resurtido
+            </button>
+          </div>
+        </div>
+
+        <div id="season-feedback-msg" class="verify-feedback ok hidden" style="margin-bottom: 1rem;"></div>
+
+        <table class="inventory-table">
+          <thead>
+            <tr>
+              <th>Artículo</th>
+              <th>Media Habitual / Mes</th>
+              <th>Media Temporada Alta</th>
+              <th>Sugerido (Media +15%)</th>
+              <th>Stock Programado (Editable)</th>
+              <th>Estado vs Meta</th>
+            </tr>
+          </thead>
+          <tbody id="tabla-temporada-body"></tbody>
+        </table>
+      </div>
+    </section>
+
     <!-- PEDIDOS -->
     <section id="tab-pedidos" class="seller-tab-content hidden">
       <div class="orders-split">
         <div class="card-surface panel-box">
-          <h3><i data-lucide="shopping-cart"></i> Pedidos de Clientes</h3>
+          <div class="panel-box-header">
+            <h3><i data-lucide="shopping-cart"></i> Pedidos de Clientes</h3>
+          </div>
           <div id="lista-pedidos-clientes" class="orders-list">
             <div class="empty-box">
               <i data-lucide="inbox"></i>
@@ -327,11 +546,17 @@
         </div>
 
         <div class="card-surface panel-box">
-          <h3><i data-lucide="truck"></i> Reabastecimiento a Proveedores</h3>
+          <div class="panel-box-header">
+            <h3><i data-lucide="truck"></i> Reabastecimiento a Proveedores</h3>
+            <button type="button" id="btn-solicitar-todo" class="btn-primary btn-sm hidden" onclick="solicitarTodoProveedores()">
+              <i data-lucide="send"></i> Solicitar todo
+            </button>
+          </div>
+          <div id="reabastecimiento-feedback" class="verify-feedback ok hidden" style="margin-bottom: 0.75rem;"></div>
           <div id="lista-pedidos-proveedores" class="orders-list">
             <div class="empty-box">
               <i data-lucide="refresh-cw"></i>
-              <p>Los artículos con stock crítico se enlistan aquí automáticamente para resurtido.</p>
+              <p>Los artículos por debajo de su meta o stock programado de temporada se enlistan aquí.</p>
             </div>
           </div>
         </div>
@@ -353,7 +578,7 @@
 
         <div id="chat-messages-vendedor" class="chat-messages">
           <div class="msg msg-bot">
-            Adjunta una fotografía de tu producto con su precio para darlo de alta automáticamente, o escribe movimientos como: "Entraron 100 piezas del Artículo de Muestra".
+            Adjunta una fotografía de tu producto con su precio para darlo de alta automáticamente, o escribe movimientos como: "Entraron 15 kg de Tomate Saladette".
           </div>
         </div>
 
@@ -374,25 +599,223 @@
     </section>
   </main>
 
-  <!-- MODAL FICHA DE NEGOCIO -->
-  <div id="modal-tienda" class="modal-backdrop hidden" onclick="cerrarModal('modal-tienda')">
-    <div class="modal-card animate-pop" onclick="event.stopPropagation()">
+  <!-- MODAL MODIFICAR PRODUCTOS DE TEMPORADA ALTA -->
+  <div id="modal-modificar-temporada" class="modal-backdrop hidden" onclick="cerrarModal('modal-modificar-temporada')">
+    <div class="modal-card modal-lg animate-pop" onclick="event.stopPropagation()">
       <div class="modal-header">
         <div>
-          <span class="badge-verified"><i data-lucide="shield-check"></i> Negocio Verificado</span>
-          <h2 id="modal-tienda-nombre">Ficha del Establecimiento</h2>
-          <p id="modal-tienda-historia">Catálogo activo vinculado al inventario del local.</p>
+          <h2>Modificar Lista de Temporada Alta</h2>
+          <p>Agrega o quita productos de tu inventario registrado para decidir cuáles incluir en el resurtido de temporada.</p>
+        </div>
+        <button class="btn-close" onclick="cerrarModal('modal-modificar-temporada')"><i data-lucide="x"></i></button>
+      </div>
+
+      <div class="modal-body modal-scroll">
+        <div class="drawer-search-box" style="margin-bottom: 0.85rem;">
+          <i data-lucide="search"></i>
+          <input
+            type="text"
+            id="buscar-producto-temporada-modal"
+            placeholder="Filtrar productos de tu inventario..."
+            oninput="renderizarListaModificarTemporada()"
+          />
+        </div>
+
+        <div id="lista-productos-modificar-temporada" class="season-manage-list"></div>
+
+        <div style="margin-top: 1rem; display: flex; justify-content: flex-end;">
+          <button type="button" class="btn-primary" onclick="cerrarModal('modal-modificar-temporada')">
+            <i data-lucide="check"></i> Listo
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL FICHA DE NEGOCIO Y CALIFICACIONES -->
+  <div id="modal-tienda" class="modal-backdrop hidden" onclick="cerrarModal('modal-tienda')">
+    <div class="modal-card modal-lg animate-pop" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <div>
+          <div class="store-badges-row">
+            <span class="badge-verified"><i data-lucide="shield-check"></i> Negocio Verificado</span>
+            <span class="store-rating-summary" id="modal-tienda-rating">
+              <i data-lucide="star"></i> <strong>4.8</strong> (2 reseñas)
+            </span>
+            <span id="modal-tienda-zona-badge" class="store-zone-pill hidden"></span>
+            <span id="modal-tienda-promo-tag" class="promo-tag-modal hidden"></span>
+          </div>
+          <h2 id="modal-tienda-nombre">Productores y Abarrotes del Centro</h2>
+          <p id="modal-tienda-historia">Venta directa sin intermediarios con existencias actualizadas al momento.</p>
         </div>
         <button class="btn-close" onclick="cerrarModal('modal-tienda')"><i data-lucide="x"></i></button>
       </div>
 
-      <div class="modal-body">
-        <h4>Disponibilidad Actual</h4>
-        <div id="modal-tienda-productos" class="store-products-grid">
-          <div class="empty-box">
-            <p>Conecta la consulta de productos por <code>negocio_id</code> para listar el catálogo real.</p>
+      <div class="modal-body modal-scroll">
+        <div class="store-catalog-header">
+          <h4>Disponibilidad Actual en Inventario</h4>
+          <button type="button" class="btn-ghost btn-sm" onclick="cerrarModal('modal-tienda'); abrirModalCarrito('carrito');">
+            <i data-lucide="shopping-cart"></i> Ir al carrito (<span id="modal-tienda-cart-count">0</span>)
+          </button>
+        </div>
+        <div id="store-cart-feedback" class="verify-feedback ok hidden" style="margin-top: 0.65rem;"></div>
+        <div id="modal-tienda-productos" class="store-products-grid"></div>
+
+        <!-- APARTADO DE CALIFICACIONES CON ESTRELLAS -->
+        <div class="rating-section">
+          <h4>Calificar este establecimiento</h4>
+          <form id="form-calificacion" onsubmit="enviarCalificacionTienda(event)">
+            <div class="star-picker" id="star-picker">
+              <button type="button" class="star-btn active" data-val="1" onclick="seleccionarEstrella(1)" aria-label="1 estrella"><i data-lucide="star"></i></button>
+              <button type="button" class="star-btn active" data-val="2" onclick="seleccionarEstrella(2)" aria-label="2 estrellas"><i data-lucide="star"></i></button>
+              <button type="button" class="star-btn active" data-val="3" onclick="seleccionarEstrella(3)" aria-label="3 estrellas"><i data-lucide="star"></i></button>
+              <button type="button" class="star-btn active" data-val="4" onclick="seleccionarEstrella(4)" aria-label="4 estrellas"><i data-lucide="star"></i></button>
+              <button type="button" class="star-btn active" data-val="5" onclick="seleccionarEstrella(5)" aria-label="5 estrellas"><i data-lucide="star"></i></button>
+              <span id="star-label-text" class="star-label-text">5 de 5 — Excelente</span>
+            </div>
+            <div class="rating-input-row">
+              <input type="text" id="rating-comentario" placeholder="Escribe un comentario breve sobre el servicio o calidad..." required />
+              <button type="submit" class="btn-primary">Enviar</button>
+            </div>
+          </form>
+
+          <div id="lista-resenas-tienda" class="reviews-list"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL CARRITO DE COMPRAS, PAGO (EN LINEA / TIENDA) Y ESTADO DE DESPACHO -->
+  <div id="modal-carrito" class="modal-backdrop hidden" onclick="cerrarModal('modal-carrito')">
+    <div class="modal-card modal-lg animate-pop" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <div>
+          <h2>Carrito y Pedidos Pick-Up</h2>
+          <p>Guarda productos para ver qué hay en tienda o confirma tu pago para enviarlo al vendedor.</p>
+        </div>
+        <button class="btn-close" onclick="cerrarModal('modal-carrito')"><i data-lucide="x"></i></button>
+      </div>
+
+      <div class="cart-modal-tabs">
+        <button type="button" class="auth-tab active" id="tab-btn-carrito" onclick="cambiarTabModalCarrito('carrito')">
+          Mi Carrito (<span id="tab-cart-count">0</span>)
+        </button>
+        <button type="button" class="auth-tab" id="tab-btn-mis-pedidos" onclick="cambiarTabModalCarrito('pedidos')">
+          Mis Pedidos (<span id="tab-orders-count">0</span>)
+        </button>
+      </div>
+
+      <div id="panel-carrito-compra" class="modal-body modal-scroll">
+        <div id="cart-stock-alert" class="cart-stock-alert hidden"></div>
+        <div id="lista-items-carrito" class="cart-items-list"></div>
+
+        <div id="cart-checkout-section" class="cart-checkout-box hidden">
+          <div class="cart-total-row">
+            <span>Total de tu carrito</span>
+            <strong id="cart-total-price">$0.00 MXN</strong>
+          </div>
+          <p class="cart-note">
+            <i data-lucide="info" class="icon-sm"></i>
+            <span>Mientras no confirmes el pago, tu selección queda guardada solo en tu carrito sin enviarse al vendedor.</span>
+          </p>
+
+          <div class="payment-options">
+            <label class="payment-choice active" id="choice-pago-online" onclick="seleccionarMetodoPago('online')">
+              <input type="radio" name="metodo-pago" value="online" checked />
+              <div>
+                <strong><i data-lucide="credit-card" class="icon-sm"></i> Pagar en línea</strong>
+                <small>Pago inmediato y envío directo al vendedor para despachar.</small>
+              </div>
+            </label>
+            <label class="payment-choice" id="choice-pago-tienda" onclick="seleccionarMetodoPago('tienda')">
+              <input type="radio" name="metodo-pago" value="tienda" />
+              <div>
+                <strong><i data-lucide="store" class="icon-sm"></i> Pagar en la tienda</strong>
+                <small>Confirma tu pedido para recoger y pagas al momento en mostrador.</small>
+              </div>
+            </label>
+          </div>
+
+          <div id="online-payment-box" class="online-payment-fields">
+            <div class="form-row">
+              <div class="input-group" style="margin-bottom:0;">
+                <label for="pago-titular">Nombre del titular</label>
+                <input type="text" id="pago-titular" placeholder="Titular de la tarjeta" />
+              </div>
+              <div class="input-group" style="margin-bottom:0;">
+                <label for="pago-terminacion">Últimos 4 dígitos</label>
+                <input type="text" id="pago-terminacion" inputmode="numeric" maxlength="4" oninput="soloNumeros(this)" placeholder="4512" />
+              </div>
+            </div>
+          </div>
+
+          <div id="cart-checkout-msg" class="verify-feedback hidden" style="margin-bottom: 0.75rem;"></div>
+
+          <button type="button" id="btn-confirmar-carrito" class="btn-primary btn-full" onclick="confirmarPedidoCarrito()">
+            <i data-lucide="check-circle-2"></i>
+            <span>Confirmar y enviar pedido al vendedor</span>
+          </button>
+        </div>
+      </div>
+
+      <div id="panel-mis-pedidos" class="modal-body modal-scroll hidden">
+        <div id="lista-pedidos-comprador" class="orders-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL PROMOCION Y POSICIONAMIENTO EN RECOMENDADOS -->
+  <div id="modal-promocion" class="modal-backdrop hidden" onclick="cerrarModal('modal-promocion')">
+    <div class="modal-card modal-lg animate-pop" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <div>
+          <h2>Visibilidad y Sección Recomendados</h2>
+          <p>Destaca tu negocio en el directorio y búsquedas de compradores cercanos.</p>
+        </div>
+        <button class="btn-close" onclick="cerrarModal('modal-promocion')"><i data-lucide="x"></i></button>
+      </div>
+
+      <div class="modal-body modal-scroll">
+        <div class="organic-box">
+          <div class="organic-header">
+            <div>
+              <strong><i data-lucide="trending-up" class="icon-sm"></i> Recomendación Orgánica por Ventas</strong>
+              <p>Al acumular <strong>20 ventas o pedidos</strong>, tu negocio entra automáticamente a Recomendados sin costo.</p>
+            </div>
+            <span id="organic-status-pill" class="badge-ok">Activo</span>
+          </div>
+          <div class="progress-track">
+            <div id="organic-progress-bar" class="progress-fill" style="width: 100%;"></div>
+          </div>
+          <div class="organic-footer">
+            <span id="organic-sales-label">28 de 20 ventas completadas</span>
+            <button type="button" class="btn-demo-mini" onclick="simularVentasDemo()">+5 ventas de prueba</button>
           </div>
         </div>
+
+        <h4 class="promo-plans-title">Impulso Patrocinado (Activación inmediata)</h4>
+        <div class="promo-plans-grid">
+          <div class="promo-plan-card">
+            <span class="plan-tag">Local 24h</span>
+            <strong>$49 MXN</strong>
+            <p>Prioridad en búsquedas de tu colonia durante 24 horas.</p>
+            <button type="button" class="btn-primary btn-full" onclick="activarPromocionNegocio('Impulso Local 24h')">Activar plan</button>
+          </div>
+          <div class="promo-plan-card featured">
+            <span class="plan-tag">Semanal</span>
+            <strong>$149 MXN</strong>
+            <p>Insignia destacada en Recomendados y primer lugar en filtro cercano.</p>
+            <button type="button" class="btn-primary btn-full" onclick="activarPromocionNegocio('Destacado Semanal')">Activar plan</button>
+          </div>
+          <div class="promo-plan-card">
+            <span class="plan-tag">Mensual</span>
+            <strong>$399 MXN</strong>
+            <p>Posicionamiento continuo + sugerencia directa en el asistente IA.</p>
+            <button type="button" class="btn-primary btn-full" onclick="activarPromocionNegocio('Top Prioridad Mensual')">Activar plan</button>
+          </div>
+        </div>
+
+        <div id="promo-feedback-msg" class="verify-feedback hidden"></div>
       </div>
     </div>
   </div>
@@ -422,7 +845,7 @@
     </div>
   </div>
 
-  <!-- MODAL ALTA MANUAL DE ARTICULO CON CATEGORIA Y SUBCATEGORIA -->
+  <!-- MODAL ALTA MANUAL DE ARTICULO CON CATEGORIA, SUBCATEGORIA Y UNIDAD -->
   <div id="modal-nuevo-producto" class="modal-backdrop hidden" onclick="cerrarModal('modal-nuevo-producto')">
     <div class="modal-card animate-pop" onclick="event.stopPropagation()">
       <div class="modal-header">
@@ -435,35 +858,90 @@
       <form onsubmit="guardarProductoManual(event)">
         <div class="input-group">
           <label>Nombre del artículo</label>
-          <input type="text" id="prod-nombre" required />
+          <input type="text" id="prod-nombre" placeholder="Ej. Tomate Saladette, Leche entera, Cerveza artesanal..." required />
         </div>
         <div class="form-row">
           <div class="input-group">
             <label>Categoría</label>
-            <select id="prod-categoria" class="select-field" onchange="actualizarSubcategoriasModal(this.value)">
-              <option value="Producción Local">Producción Local</option>
-              <option value="Tiendas y Abarrotes">Tiendas y Abarrotes</option>
-              <option value="Insumos y Papelería">Insumos y Papelería</option>
-              <option value="Talleres y Oficios">Talleres y Oficios</option>
-            </select>
+            <select id="prod-categoria" class="select-field" onchange="actualizarSubcategoriasModal(this.value)"></select>
           </div>
           <div class="input-group">
             <label>Subcategoría</label>
-            <select id="prod-subcategoria" class="select-field"></select>
+            <select id="prod-subcategoria" class="select-field" onchange="actualizarUnidadesModal()"></select>
           </div>
         </div>
-        <div class="form-row">
+        <div class="form-row-3">
           <div class="input-group">
-            <label>Precio Unitario ($)</label>
-            <input type="text" id="prod-precio" inputmode="decimal" oninput="soloDecimales(this)" placeholder="0.00" required />
+            <label>Unidad de medida</label>
+            <select id="prod-unidad" class="select-field" onchange="ajustarPlaceholderStock()"></select>
           </div>
           <div class="input-group">
-            <label>Cantidad inicial (solo enteros)</label>
-            <input type="text" id="prod-stock" inputmode="numeric" oninput="soloNumeros(this)" placeholder="100" required />
+            <label>Cantidad inicial</label>
+            <input type="text" id="prod-stock" inputmode="decimal" oninput="validarInputSegunUnidad(this)" placeholder="25" required />
+          </div>
+          <div class="input-group">
+            <label>Precio por unidad ($)</label>
+            <input type="text" id="prod-precio" inputmode="decimal" oninput="soloDecimales(this)" placeholder="0.00" required />
           </div>
         </div>
         <button type="submit" class="btn-primary btn-full">Guardar en Inventario</button>
       </form>
+    </div>
+  </div>
+
+  <!-- MODAL PETICION DE NUEVA CATEGORIA / SUBCATEGORIA AL ADMINISTRADOR -->
+  <div id="modal-solicitar-categoria" class="modal-backdrop hidden" onclick="cerrarModal('modal-solicitar-categoria')">
+    <div class="modal-card modal-lg animate-pop" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <div>
+          <h2>Solicitar Nueva Categoría o Subcategoría</h2>
+          <p>Las propuestas se envían al administrador de la plataforma para mantener el catálogo ordenado.</p>
+        </div>
+        <button class="btn-close" onclick="cerrarModal('modal-solicitar-categoria')"><i data-lucide="x"></i></button>
+      </div>
+      <div class="modal-body modal-scroll">
+        <form onsubmit="enviarPeticionCategoria(event)">
+          <div class="form-row">
+            <div class="input-group">
+              <label>Tipo de solicitud</label>
+              <select id="pet-tipo" class="select-field" onchange="toggleCategoriaPadrePeticion(this.value)">
+                <option value="subcategoria">Nueva Subcategoría (dentro de una existente)</option>
+                <option value="categoria">Nueva Categoría Principal</option>
+              </select>
+            </div>
+            <div class="input-group" id="grupo-pet-padre">
+              <label>Categoría principal donde irá</label>
+              <select id="pet-categoria-padre" class="select-field"></select>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="input-group">
+              <label>Nombre propuesto</label>
+              <input type="text" id="pet-nombre" placeholder="Ej. Apicultura y Cera, Refacciones..." required />
+            </div>
+            <div class="input-group">
+              <label>Unidades de medida sugeridas</label>
+              <input type="text" id="pet-unidades" placeholder="Ej. kg, lt, pz, caja" required />
+            </div>
+          </div>
+
+          <div class="input-group">
+            <label>Ejemplos de productos que venderás ahí</label>
+            <input type="text" id="pet-ejemplo" placeholder="Ej. Propóleo, cera estampada, miel multiflora" required />
+          </div>
+
+          <button type="submit" class="btn-primary btn-full">
+            <i data-lucide="send"></i>
+            <span>Enviar petición al administrador</span>
+          </button>
+        </form>
+
+        <div class="requests-history">
+          <h4>Peticiones enviadas por tu negocio</h4>
+          <div id="lista-peticiones-categorias" class="requests-list"></div>
+        </div>
+      </div>
     </div>
   </div>
 
