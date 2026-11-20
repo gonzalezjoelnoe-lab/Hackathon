@@ -4,9 +4,19 @@
    No reemplaza app.js: sobreescribe DB_HOOKS y unas pocas funciones.
    ===================================================================== */
 
+/*
 const SUPABASE_URL = 'https://sizgktvthrvijrpzqjve.supabase.co/rest/v1/';   // Project Settings > API
 const SUPABASE_ANON_KEY = 'sb_publishable_rA3ZAagAc-IlwoASGxg4Ug_GSEXE7PD';     // la clave "anon public" (NUNCA la service_role)
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+*/
+
+const SUPABASE_URL = 'https://sizgktvthrvijrpzqjve.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_rA3ZAagAc-IlwoASGxg4Ug_GSEXE7PD';
+
+const sb = window.supabase.createClient(
+  SUPABASE_URL,
+  SUPABASE_ANON_KEY
+);
 
 let datosReales = false;       // true cuando las tiendas vienen de la base de datos
 let canalesRT = [];
