@@ -36,9 +36,6 @@ export default async function handler(req, res) {
   let systemInstruction = '';
   const parts = [];
 
-  // =========================================================================
-  // 1. ASISTENTE DE BÚSQUEDA PARA EL COMPRADOR
-  // =========================================================================
   if (modo === 'COMPRADOR') {
     systemInstruction = `
 Eres el Asistente de Búsqueda Inteligente de NexoLocal, una plataforma de comercio de barrio y productores directos.
@@ -62,12 +59,7 @@ Responde SIEMPRE con este JSON exacto:
     parts.push({
       text: `CATÁLOGO DISPONIBLE EN TIENDAS (JSON):\n${JSON.stringify(contextoProductos)}\n\nCONSULTA DEL COMPRADOR:\n"${mensaje}"`
     });
-  }
-
-  // =========================================================================
-  // 2. ASISTENTE OPERATIVO Y DE AYUDA PARA EL VENDEDOR
-  // =========================================================================
-  else if (modo === 'VENDEDOR') {
+  } else if (modo === 'VENDEDOR') {
     systemInstruction = `
 Eres el Asistente Operativo y de Ayuda para Negocios de NexoLocal.
 Ayudas al vendedor/productor en tres tareas principales:
@@ -125,12 +117,7 @@ Si accion es "CONSULTA", pon "datos": null.
         }
       });
     }
-  }
-
-  // =========================================================================
-  // 3. VALIDACIÓN VISUAL EN VIVO DEL NEGOCIO
-  // =========================================================================
-  else if (modo === 'VERIFICAR_HUMANO') {
+  } else if (modo === 'VERIFICAR_HUMANO') {
     systemInstruction = `
 Eres el sistema de verificación de identidad presencial de NexoLocal.
 Analiza la fotografía enviada por el comerciante y verifica si cumple con el reto solicitado: "${retoVerificacion}".
@@ -155,57 +142,85 @@ Responde ÚNICAMENTE con este JSON:
     }
   }
 
-  const modelos = ['gemini-2.5-flash', 'gemini-2.0-flash'];
-  let ultimoStatus = 500;
-  let ultimoDetalle = 'No se pudo contactar con Gemini.';
-
-  for (const modelo of modelos) {
-    try {
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${modelo}:generateContent?key=${encodeURIComponent(apiKey)}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            system_instruction: {
-              parts: [{ text: systemInstruction }]
-            },
-            contents: [
-              {
-                role: 'user',
-                parts
-              }
-            ],
-            generationConfig: {
-              temperature: 0.35,
-              responseMimeType: 'application/json'
+  async function intentarConModelo(modelo) {
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${modelo}:generateContent?key=${encodeURIComponent(apiKey)}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          system_instruction: {
+            parts: [{ text: systemInstruction }]
+          },
+          contents: [
+            {
+              role: 'user',
+              parts
             }
-          })
-        }
-      );
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        ultimoStatus = response.status;
-        ultimoDetalle = data?.error?.message || JSON.stringify(data);
-        continue;
+          ],
+          generationConfig: {
+            temperature: 0.35,
+            responseMimeType: 'application/json'
+          }
+        })
       }
+    );
 
-      const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
-      const cleanJson = rawText.replace(/```json|```/gi, '').trim();
-      const parsed = JSON.parse(cleanJson);
+    const data = await response.json();
+    if (!response.ok) {
+      return {
+        ok: false,
+        status: response.status,
+        detalle: data?.error?.message || JSON.stringify(data)
+      };
+    }
 
-      return res.status(200).json(parsed);
-    } catch (error) {
-      ultimoDetalle = error.message || 'Error de red o formato JSON.';
+    const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
+    const cleanJson = rawText.replace(/```json|```/gi, '').trim();
+    return { ok: true, parsed: JSON.parse(cleanJson) };
+  }
+
+  // 1. Intento directo con gemini-3.8-flash
+  let resultado = await intentarConModelo('gemini-3.8-flash');
+  if (resultado.ok) {
+    return res.status(200).json(resultado.parsed);
+  }
+
+  // 2. Si da 404, consulta los modelos activos en tu clave y usa el primer Flash disponible
+  if (resultado.status === 404) {
+    try {
+      const listResp = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(apiKey)}`
+      );
+      if (listResp.ok) {
+        const listData = await listResp.json();
+        const disponibles = (listData.models || [])
+          .filter(
+            m =>
+              Array.isArray(m.supportedGenerationMethods) &&
+              m.supportedGenerationMethods.includes('generateContent') &&
+              /flash/i.test(m.name)
+          )
+          .map(m => m.name.replace(/^models\//, ''))
+          .reverse();
+
+        for (const mod of disponibles) {
+          if (mod === 'gemini-3.8-flash') continue;
+          resultado = await intentarConModelo(mod);
+          if (resultado.ok) {
+            return res.status(200).json(resultado.parsed);
+          }
+        }
+      }
+    } catch {
+      // Continúa al reporte de error
     }
   }
 
-  return res.status(ultimoStatus).json({
+  return res.status(resultado.status || 500).json({
     accion: 'CONSULTA',
     aprobado: false,
-    razon: `Error Gemini (${ultimoStatus}): ${ultimoDetalle}`,
-    mensaje_usuario: `Error Gemini (${ultimoStatus}): ${ultimoDetalle}`
+    razon: `Error Gemini (${resultado.status}): ${resultado.detalle}`,
+    mensaje_usuario: `Error Gemini (${resultado.status}): ${resultado.detalle}`
   });
 }
